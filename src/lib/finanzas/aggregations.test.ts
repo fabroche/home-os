@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { resumen } from "./aggregations";
-import type { Movimiento } from "@/types/finanzas";
+import { resumen, gastosPorCategoria, porMes, resumenDeudas } from "./aggregations";
+import type { Movimiento, Deuda } from "@/types/finanzas";
 
 function mov(flujo: Movimiento["flujo"], importe: number | null): Movimiento {
   return {
@@ -36,5 +36,58 @@ describe("resumen", () => {
     const r = resumen([mov("ingreso", null), mov("gasto", -50)]);
     expect(r.balance).toBe(-50);
     expect(r.ingresos).toBe(0);
+  });
+});
+
+function movCF(flujo: Movimiento["flujo"], importe: number, categoria: string | null, fecha: string | null): Movimiento {
+  return { ...mov(flujo, importe), categoria, fecha };
+}
+
+describe("gastosPorCategoria", () => {
+  it("agrupa gastos por categoría (magnitud) y ordena desc; ignora ingresos", () => {
+    const r = gastosPorCategoria([
+      movCF("gasto", -30, "Comida", "2026-06-01"),
+      movCF("gasto", -70, "Casa", "2026-06-01"),
+      movCF("gasto", -20, "Comida", "2026-06-02"),
+      movCF("ingreso", 1000, "Salario", "2026-06-01"),
+      movCF("gasto", -10, null, "2026-06-01"),
+    ]);
+    expect(r[0]).toEqual({ categoria: "Casa", total: 70 });
+    expect(r[1]).toEqual({ categoria: "Comida", total: 50 });
+    expect(r.find((x) => x.categoria === "Sin categoría")?.total).toBe(10);
+    expect(r.some((x) => x.categoria === "Salario")).toBe(false);
+  });
+});
+
+describe("porMes", () => {
+  it("agrega ingresos/gastos/balance por mes y ordena desc", () => {
+    const r = porMes([
+      movCF("ingreso", 1000, null, "2026-06-10"),
+      movCF("gasto", -200, null, "2026-06-15"),
+      movCF("gasto", -50, null, "2026-05-01"),
+    ]);
+    expect(r[0]?.mes).toBe("2026-06");
+    expect(r[0]).toMatchObject({ ingresos: 1000, gastos: 200, balance: 800 });
+    expect(r[1]).toMatchObject({ mes: "2026-05", gastos: 50, balance: -50 });
+  });
+});
+
+function deuda(valor: number | null, persona: string | null): Deuda {
+  return {
+    notionPageId: Math.random().toString(36),
+    concepto: "x",
+    fechaCreacion: "2026-06-01",
+    valor,
+    persona,
+    ultimaEdicion: "2026-06-01T00:00:00.000Z",
+  };
+}
+
+describe("resumenDeudas", () => {
+  it("suma magnitudes y agrupa por persona", () => {
+    const r = resumenDeudas([deuda(-100, "Leo"), deuda(50, "Leo"), deuda(200, "Guille")]);
+    expect(r.total).toBe(350);
+    expect(r.porPersona[0]).toEqual({ persona: "Guille", total: 200 });
+    expect(r.porPersona.find((p) => p.persona === "Leo")?.total).toBe(150);
   });
 });
