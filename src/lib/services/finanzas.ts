@@ -1,4 +1,4 @@
-import "server-only";
+import "@/lib/server-guard";
 import { queryDatabase } from "@/lib/notion/databases";
 import { PRESUPUESTO, DEUDAS } from "@/lib/notion/schema";
 import { toMovimiento } from "@/lib/notion/mappers/presupuesto";

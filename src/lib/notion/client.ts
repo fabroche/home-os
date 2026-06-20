@@ -1,4 +1,4 @@
-import "server-only";
+import "@/lib/server-guard";
 import { Client } from "@notionhq/client";
 import { requireEnv } from "@/config/env";
 

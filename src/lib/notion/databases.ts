@@ -1,4 +1,4 @@
-import "server-only";
+import "@/lib/server-guard";
 import type { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 import { notion } from "./client";
 import { nq } from "./rate-limit";
