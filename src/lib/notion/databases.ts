@@ -10,10 +10,11 @@ import { paginate } from "./paginate";
  */
 export async function queryDatabase(
   databaseId: string,
-  pageSize = 50,
+  pageSize = 100,
 ): Promise<PageObjectResponse[]> {
-  // page_size moderado (no 100): respuestas más pequeñas evitan cortes "premature
-  // close" por MTU en el egress de contenedores. Combinado con retry de red.
+  // page_size al máximo de Notion (100). El "premature close" no era MTU sino el
+  // node-fetch@2 del SDK (ver lib/notion/client.ts). El retry de red se mantiene
+  // como defensa ante cortes transitorios reales.
   return paginate<PageObjectResponse>(async (cursor) => {
     const res = await nq(() =>
       notion.databases.query({ database_id: databaseId, start_cursor: cursor, page_size: pageSize }),
