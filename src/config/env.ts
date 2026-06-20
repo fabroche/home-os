@@ -27,6 +27,8 @@ const envSchema = z.object({
   // Notion
   NOTION_API_KEY: z.string().optional(),
   NOTION_WEBHOOK_SECRET: z.string().optional(),
+  NOTION_DB_PRESUPUESTO_ID: z.string().optional(), // por defecto en lib/notion/schema.ts
+  NOTION_DB_DEUDAS_ID: z.string().optional(),
 
   // Google (Gmail + Calendar)
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -48,7 +50,13 @@ const envSchema = z.object({
   CLAUDE_WORKDIR: z.string().default("./worker/agent"),
 });
 
-const parsed = envSchema.safeParse(process.env);
+// Trata las variables vacías ("") como ausentes, para que los placeholders
+// vacíos de .env.example no rompan la validación de campos opcionales.
+const rawEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([, value]) => value !== ""),
+);
+
+const parsed = envSchema.safeParse(rawEnv);
 
 if (!parsed.success) {
   console.error("❌ Variables de entorno inválidas:", parsed.error.flatten().fieldErrors);

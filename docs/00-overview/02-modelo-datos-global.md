@@ -151,6 +151,10 @@ erDiagram
 ```
 
 ## Notas de diseño
+- **Finanzas (schema real de Notion)**: en la práctica las finanzas son **una sola tabla** `Presupuesto`
+  (ingresos+gastos, distinguidos por `type`, importes **firmados**) + `Deudas_Personales`. El espejo en
+  Supabase será **`MOVIMIENTO`** + **`DEUDA`** (en lugar de `GASTO`/`INGRESO` separados de arriba). Las
+  facturas (`invoices`, files) ya van adjuntas en Notion. Ver `docs/modules/M1-finanzas.md` §5.
 - **Híbrido Notion↔Supabase**: `GASTO`, `INGRESO`, `VIAJE`, `EVENTO`, `ENTRADA_CONTEXTO` pueden tener
   `notion_page_id`. `SYNC_STATE` guarda el cursor/last_edited por DB de Notion para sync incremental.
 - **Idempotencia de correo**: único `(cuenta_id, message_id)` en `CORREO` → no se duplican facturas.

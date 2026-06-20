@@ -37,9 +37,34 @@ Usuario; Worker (sync); Agente IA headless (conciliación, consultas RAG).
 | RNF-M1-003 | Consistencia | Sin duplicar registros en re-sync (clave `notion_page_id`). |
 | RNF-M1-004 | Trazabilidad | Conciliaciones y escrituras a Notion → `AUDIT_LOG`. |
 
-## 5. Modelo de datos (fragmento)
-`GASTO`, `INGRESO`, `CATEGORIA`, `FACTURA` (de M3), `SYNC_STATE`. Ver ER global.
-Clave: `GASTO.notion_page_id` (espejo) + `GASTO.factura_id` (conciliación 1:1).
+## 5. Modelo de datos (fragmento) — schema REAL de Notion
+
+La DB de Notion confirmó el modelo (página *Finances* → 2 bases):
+
+**`Presupuesto`** (una sola tabla para ingresos y gastos) → dominio **`Movimiento`**:
+| Notion | Tipo | Dominio | Notas |
+|--------|------|---------|-------|
+| `Name` | title | `nombre` | |
+| `Date` | date | `fecha` | |
+| `amount` | number (€) | `importe` | **firmado**: gastos en negativo |
+| `category` | select | `categoria` | Salario, Casa, Desarrollo, Osio, Confort, Viaje, Medicina, Transporte, Restaurantes, Comida, Deuda |
+| `type` | select | `tipo` | Gasto Fijo/Variable/Hormiga, Ingreso Fijo/Variable, Deuda |
+| `status` | status | `estado` | Pending / Done |
+| `invoices` | files | `facturas` | **las facturas ya van adjuntas aquí** (impacta M3: parte de la "conciliación" ya está en Notion) |
+
+`flujo` (`ingreso`/`gasto`/`deuda`) se **deriva** de `type`. `balance` = suma firmada de todos los importes.
+
+**`Deudas_Personales`** → dominio **`Deuda`**: `Deuda`(title)→`concepto`, `Fecha de Creación`(date),
+`Valor`(number €), `Persona_A_Pagar_Cobrar`(select: Tia Anay, RafaYDay, Leo, Guille).
+
+> En Supabase el espejo será `MOVIMIENTO` + `DEUDA` (no `GASTO`/`INGRESO` separados): coincide con cómo
+> trabajas en Notion. `notion_page_id` como clave de upsert; `SYNC_STATE` para el sync incremental.
+
+### Estado de implementación (T1 hecho)
+- ✅ Capa Notion (`client`, `schema`, `paginate`, `rate-limit`, `properties`, `mappers`).
+- ✅ `src/types/finanzas.ts` (`Movimiento`, `Deuda` + Zod), `lib/services/finanzas.ts` (`listMovimientos`/`listDeudas`/`resumen`).
+- ✅ `/finanzas` lee **en vivo** de Notion (interim) — verificado end-to-end. Tests: mappers + resumen.
+- ⏭️ Pendiente: sync a Supabase (requiere credenciales Supabase) → la UI pasará a leer de Supabase.
 
 ## 6. Arquitectura / componentes
 - `lib/notion/sync/finanzas.ts` — pull incremental de las DBs de finanzas (cursor en `SYNC_STATE`).
