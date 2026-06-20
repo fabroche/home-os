@@ -28,17 +28,47 @@ async function main() {
 
   const { createSupabaseServiceClient } = await import("@/lib/supabase/service");
   const sb = createSupabaseServiceClient();
+
   const { data, error } = await sb.auth.admin.createUser({
     email,
     password,
     email_confirm: true, // confirmado al instante, sin email
   });
+
   if (error) {
-    console.error("❌ Error creando usuario:", error.message);
-    process.exit(1);
+    // Si ya existe, RESETEAR su contraseña (crear-o-actualizar, idempotente).
+    if (/registered|already|exists/i.test(error.message)) {
+      const { data: list, error: listErr } = await sb.auth.admin.listUsers();
+      if (listErr) {
+        console.error("❌ Error listando usuarios:", listErr.message);
+        process.exit(1);
+      }
+      const existing = list.users.find(
+        (u) => u.email?.toLowerCase() === email.toLowerCase(),
+      );
+      if (!existing) {
+        console.error(`❌ '${email}' figura como registrado pero no se encontró. ¿Email exacto?`);
+        process.exit(1);
+      }
+      const { error: upErr } = await sb.auth.admin.updateUserById(existing.id, {
+        password,
+        email_confirm: true,
+      });
+      if (upErr) {
+        console.error("❌ Error actualizando contraseña:", upErr.message);
+        process.exit(1);
+      }
+      console.log(`🔄 Usuario existente actualizado (contraseña reseteada + confirmado): ${email}`);
+    } else {
+      console.error("❌ Error creando usuario:", error.message);
+      process.exit(1);
+    }
+  } else {
+    console.log(`✅ Usuario creado y confirmado: ${data.user?.email}`);
   }
-  console.log(`✅ Usuario creado y confirmado: ${data.user?.email}`);
-  console.log("   Ahora puedes iniciar sesión. Recuerda borrar ADMIN_* de .env.local.");
+
+  console.log("   Inicia sesión con EXACTAMENTE ese email y contraseña.");
+  console.log("   Recuerda borrar ADMIN_* de .env.local después.");
 }
 
 main().catch((err) => {
