@@ -16,6 +16,7 @@ const envSchema = z.object({
   // App
   APP_URL: z.string().url().default("http://localhost:3000"),
   CRON_SECRET: z.string().optional(),
+  SYNC_CRON: z.string().default("*/15 * * * *"), // worker: frecuencia del sync (cron 5 campos)
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
   // Supabase

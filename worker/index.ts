@@ -1,17 +1,49 @@
 /**
- * home-os — WORKER (stub)
+ * home-os — WORKER
  *
- * Proceso aparte de la app web. Responsabilidades (a implementar):
- *  - Scheduler (node-cron): sync Notion↔Supabase, polling de correo, descubrimiento de eventos.
- *  - Runner IA: toma tareas de `ai_jobs` y las ejecuta con Claude Code headless (suscripción).
+ * Proceso aparte de la app web. Ejecuta el sync Notion→Supabase de forma
+ * periódica (node-cron). Más adelante añadirá: polling de correo (M3),
+ * descubrimiento de eventos (M2) y el runner IA headless (M6).
  *
- * Ver docs/transversal/infra-devops.md y docs/modules/M6-asistente-ia.md
+ * Local: `npm run worker` (carga .env.local). En Docker el env viene del contenedor.
  */
-function main() {
-  console.warn("[worker] stub — sin jobs configurados todavía. Ver docs/modules/M6-asistente-ia.md");
+import cron from "node-cron";
+
+async function runSync() {
+  const started = Date.now();
+  try {
+    // Import dinámico para que el env ya esté cargado al validar en los módulos.
+    const { syncFinanzas } = await import("@/lib/notion/sync/finanzas");
+    const res = await syncFinanzas();
+    console.warn(
+      `[worker] sync OK · ${res.movimientos} movimientos · ${res.deudas} deudas · ${Date.now() - started}ms`,
+    );
+  } catch (err) {
+    console.error("[worker] sync ERROR:", err instanceof Error ? err.message : err);
+  }
 }
 
-main();
+async function main() {
+  try {
+    process.loadEnvFile(".env.local");
+  } catch {
+    // en Docker/prod el env ya está en process.env
+  }
+  const { env } = await import("@/config/env");
+
+  if (!cron.validate(env.SYNC_CRON)) {
+    console.error(`[worker] SYNC_CRON inválido: "${env.SYNC_CRON}"`);
+    process.exit(1);
+  }
+
+  console.warn(`[worker] iniciando · sync finanzas con cron "${env.SYNC_CRON}"`);
+  await runSync(); // corrida inicial al arrancar
+  cron.schedule(env.SYNC_CRON, runSync);
+}
+
+main().catch((err) => {
+  console.error("[worker] fatal:", err instanceof Error ? err.message : err);
+  process.exit(1);
+});
 
 export {};
-
