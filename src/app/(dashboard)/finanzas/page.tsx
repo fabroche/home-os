@@ -1,6 +1,6 @@
 import { listMovimientos, resumen } from "@/lib/services/finanzas";
 
-// Lectura en vivo de Notion (interim, hasta el sync a Supabase de M1).
+// Lee del espejo en Supabase (el worker sincroniza desde Notion).
 export const dynamic = "force-dynamic";
 
 const eur = (n: number) =>
@@ -23,7 +23,7 @@ export default async function FinanzasPage() {
     <main className="mx-auto max-w-5xl px-6 py-12">
       <h1 className="text-2xl font-semibold">Finanzas</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Lectura en vivo de Notion ({r.total} movimientos). Interim hasta el sync a Supabase (M1).
+        {r.total} movimientos · datos desde Supabase, sincronizados desde Notion.
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">

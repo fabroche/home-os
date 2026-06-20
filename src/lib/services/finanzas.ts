@@ -1,25 +1,82 @@
 import "@/lib/server-guard";
-import { queryDatabase } from "@/lib/notion/databases";
-import { PRESUPUESTO, DEUDAS } from "@/lib/notion/schema";
-import { toMovimiento } from "@/lib/notion/mappers/presupuesto";
-import { toDeuda } from "@/lib/notion/mappers/deuda";
-import type { Movimiento, Deuda } from "@/types/finanzas";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { MovimientoSchema, DeudaSchema, type Movimiento, type Deuda } from "@/types/finanzas";
 
 // Agregaciones puras (testeables sin server-only); se re-exportan por comodidad.
 export { resumen, type ResumenFinanzas } from "@/lib/finanzas/aggregations";
 
 /**
- * Servicio de dominio de finanzas.
- * INTERIM: lee directo de Notion. En M1 final leerá del espejo en Supabase
- * (el worker sincroniza); la firma de estas funciones no cambiará.
+ * Servicio de dominio de finanzas. Lee del **espejo en Supabase** (rápido, sin
+ * rate limits). El worker mantiene Supabase sincronizado desde Notion
+ * (ver lib/notion/sync/finanzas.ts).
  */
+
+// Filas de Supabase → DTO de dominio (validado con Zod).
+type MovimientoRow = {
+  notion_page_id: string;
+  nombre: string | null;
+  fecha: string | null;
+  importe: number | string | null;
+  categoria: string | null;
+  tipo: string | null;
+  estado: string | null;
+  flujo: string;
+  facturas: string[] | null;
+  url: string | null;
+  ultima_edicion: string;
+};
+
+type DeudaRow = {
+  notion_page_id: string;
+  concepto: string | null;
+  fecha_creacion: string | null;
+  valor: number | string | null;
+  persona: string | null;
+  url: string | null;
+  ultima_edicion: string;
+};
+
+function rowToMovimiento(r: MovimientoRow): Movimiento {
+  return MovimientoSchema.parse({
+    notionPageId: r.notion_page_id,
+    nombre: r.nombre ?? "",
+    fecha: r.fecha,
+    importe: r.importe == null ? null : Number(r.importe),
+    categoria: r.categoria,
+    tipo: r.tipo,
+    estado: r.estado,
+    facturas: r.facturas ?? [],
+    flujo: r.flujo,
+    url: r.url ?? undefined,
+    ultimaEdicion: r.ultima_edicion,
+  });
+}
+
+function rowToDeuda(r: DeudaRow): Deuda {
+  return DeudaSchema.parse({
+    notionPageId: r.notion_page_id,
+    concepto: r.concepto ?? "",
+    fechaCreacion: r.fecha_creacion,
+    valor: r.valor == null ? null : Number(r.valor),
+    persona: r.persona,
+    url: r.url ?? undefined,
+    ultimaEdicion: r.ultima_edicion,
+  });
+}
+
 export async function listMovimientos(): Promise<Movimiento[]> {
-  const pages = await queryDatabase(PRESUPUESTO.id);
-  return pages.map(toMovimiento);
+  const sb = createSupabaseServiceClient();
+  const { data, error } = await sb
+    .from("movimiento")
+    .select("*")
+    .order("fecha", { ascending: false, nullsFirst: false });
+  if (error) throw new Error(`listMovimientos: ${error.message}`);
+  return (data as MovimientoRow[]).map(rowToMovimiento);
 }
 
 export async function listDeudas(): Promise<Deuda[]> {
-  const pages = await queryDatabase(DEUDAS.id);
-  return pages.map(toDeuda);
+  const sb = createSupabaseServiceClient();
+  const { data, error } = await sb.from("deuda").select("*");
+  if (error) throw new Error(`listDeudas: ${error.message}`);
+  return (data as DeudaRow[]).map(rowToDeuda);
 }
-

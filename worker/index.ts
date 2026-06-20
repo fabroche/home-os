@@ -12,3 +12,6 @@ function main() {
 }
 
 main();
+
+export {};
+
