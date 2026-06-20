@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "email-imap-fetch": {
+      "source": "tiangong-ai/skills",
+      "sourceType": "github",
+      "skillPath": "email-imap-fetch/SKILL.md",
+      "computedHash": "4464a0d18acb3628dfed01d98106d42810665e69f32d7f86a3af3cc4e07adfe1"
+    },
+    "google-calendar": {
+      "source": "odyssey4me/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/google-calendar/SKILL.md",
+      "computedHash": "cbd2c157f0ad9847683468e90f275078b08f8e8473843a7d5cf0b392664e411f"
+    },
+    "gws-gmail": {
+      "source": "googleworkspace/cli",
+      "sourceType": "github",
+      "skillPath": "skills/gws-gmail/SKILL.md",
+      "computedHash": "31b12bd4bfa3fe1b5132067c597f85f5d3456060658a904a54ed6cb5b32ab6e4"
+    },
+    "gws-gmail-triage": {
+      "source": "googleworkspace/cli",
+      "sourceType": "github",
+      "skillPath": "skills/gws-gmail-triage/SKILL.md",
+      "computedHash": "12cae23da45451794098c6d8d93cb5e6163f141135769f3e986d565d4c1a8b45"
+    },
+    "notion-api": {
+      "source": "intellectronica/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/notion-api/SKILL.md",
+      "computedHash": "46d0841e05042daa8c309c4f6b7e71b6747301e98955bed2dde4ef2726dccd6c"
+    }
+  }
+}

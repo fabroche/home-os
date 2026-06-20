@@ -1,0 +1,34 @@
+# =============================================================================
+# home-os — orquestación para Dokploy (Hostinger VPS).
+# Dos servicios: la app web (Next.js) y el worker (cron + runner IA headless).
+# Supabase es gestionado (o instancia aparte); aquí solo app + worker.
+# =============================================================================
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - app
+    # El worker necesita acceso a Claude Code (suscripción) para la IA de runtime.
+    # Montar la config de Claude Code autenticada (ajustar ruta en el VPS):
+    # volumes:
+    #   - /root/.claude:/root/.claude:ro

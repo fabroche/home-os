@@ -1,0 +1,45 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# production
+/build
+/worker/dist
+
+# testing
+/coverage
+/playwright-report
+/test-results
+/.playwright
+
+# env & secretos — NUNCA commitear credenciales
+.env
+.env.*
+!.env.example
+# claves de cuentas de correo / Google OAuth descargadas
+*.credentials.json
+*-oauth.json
+gmail-token*.json
+service-account*.json
+
+# logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# misc
+.turbo
