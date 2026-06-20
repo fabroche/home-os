@@ -7,6 +7,10 @@ arquitectura y el método de documentación de `larissa-esteves-web`, añadiendo
 > **Nivel de detalle:** implementación. Cada módulo define entidades, RF/RNF, diagramas (Mermaid) y
 > criterios de aceptación.
 
+> **Estado (2026-06-20): EN PRODUCCIÓN.** App + worker + Supabase desplegados en el VPS (Dokploy).
+> Implementado: **T1** (capa Notion), **M1** (Finanzas, sync + UI), **M7** (auth single-user). Ver
+> `CLAUDE.md` → "Estado actual". El resto de módulos siguen en diseño/borrador.
+
 ## Organización (híbrido en 2 niveles)
 - **GLOBAL** (`00-overview/`) — visión, arquitectura C4, **ER global** canónico, mapa de casos de uso, convenciones.
 - **MÓDULO** (`modules/`) — un documento por módulo, con una sección por funcionalidad.
@@ -24,14 +28,14 @@ docs/
 ## Mapa de módulos
 | ID | Módulo | Estado |
 |----|--------|:------:|
-| M1 | Finanzas (Notion + facturas del correo) | 🟧 borrador |
+| M1 | Finanzas (Notion + facturas del correo) | 🟩 implementado (prod) |
 | M2 | Calendario inteligente | 🟧 borrador |
 | M3 | Backoffice / triaje de correo | 🟧 borrador |
 | M4 | Banco de contexto (IA) | 🟧 borrador |
 | M5 | Dashboard | 🟧 borrador |
 | M6 | Asistente IA / orquestación (jobs headless) | 🟧 borrador |
-| M7 | Auth & seguridad (single-user) | 🟧 borrador |
-| T1 | Integración Notion (best-practices) | 🟧 borrador |
+| M7 | Auth & seguridad (single-user) | 🟩 implementado |
+| T1 | Integración Notion (best-practices) | 🟩 implementado |
 | T2 | Integración correo (Gmail + IMAP) | 🟧 borrador |
 | T3 | Integración Calendar / eventos | 🟧 borrador |
 | T4 | Infra & DevOps (Hostinger/Dokploy/Docker) | 🟧 borrador |
@@ -53,6 +57,10 @@ docs/
 | D10 | Deploy = **Hostinger VPS + Dokploy + Docker** | `docker-compose` (app + worker). |
 | D11 | Diagramas en **Mermaid** | Embebidos, versionables por PR. |
 | D12 | **date-fns** (no Moment) | Lección del proyecto `platzi-my-store`. |
+| D13 | **Finanzas = `movimiento` + `deuda`** | Una sola tabla `Presupuesto` en Notion (ingresos+gastos por `type`, importes firmados) + `Deudas_Personales`. `flujo` derivado. |
+| D14 | **Notion con fetch nativo (undici)** | El `node-fetch@2` del SDK da "Premature close" vs Cloudflare desde el VPS; se inyecta `fetch` nativo. |
+| D15 | **Auth login/logout en cliente** | Server Action no propagaba la cookie a tiempo tras Traefik/HTTPS; el browser client la escribe + recarga completa. Middleware fail-closed. |
+| D16 | **Imágenes Docker** | app = `Dockerfile` (Next standalone, requiere `public/`); worker = `worker.Dockerfile` (`npm ci --omit=dev`, `tsx`). `NEXT_PUBLIC_*` deben estar en el build (Dokploy las da vía `.env`). |
 
 ## Estados de documento
 `⬜ pendiente` → `🟧 borrador` → `🟨 en revisión` → `🟩 aprobado`

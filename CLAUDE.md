@@ -16,7 +16,9 @@ npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
 npm run test       # Vitest
 npm run test:e2e   # Playwright
-npm run worker     # worker local (cron + runner IA)
+npm run worker     # worker local (cron de sync)
+npm run inspect:notion   # introspección read-only de una DB de Notion
+npm run sync:finanzas    # sync manual Notion→Supabase (el worker lo hace por cron)
 ```
 
 ## Arquitectura clave
@@ -56,9 +58,22 @@ La app encola tareas en `ai_jobs` (Supabase) y el `worker` las drena con el runn
 | M6 | Asistente IA (jobs headless) |
 | M7 | Auth & seguridad (single-user) |
 
-## Estado actual
-Scaffold + documentación + subagentes (sin código de features). Siguiente: implementar por módulo,
-empezando por T1 (capa Notion) + M1 (Finanzas), tras mapear el schema real de tus DBs de Notion.
+## Estado actual (2026-06-20) — EN PRODUCCIÓN
+Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **worker** (sync 24/7) +
+**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`.
+
+**Implementado:**
+- **T1 · Capa Notion** (`src/lib/notion/`): client (fetch nativo undici — el `node-fetch@2` del SDK fallaba
+  con "Premature close" vs Cloudflare), schema registry, paginación, rate-limit+retry, mappers Zod, sync.
+- **M1 · Finanzas**: sync Notion→Supabase (worker/cron) de `Presupuesto`→`movimiento` y `Deudas_Personales`→`deuda`;
+  la UI lee de Supabase; KPIs, gastos por categoría, resumen mensual y deudas. Tablas en `supabase/migrations/`.
+- **M7 · Auth**: email+contraseña single-user; login/logout **en cliente** (cookie fiable tras Traefik);
+  `src/proxy.ts` (middleware Next 16) protege rutas (fail-closed). Usuario en Supabase, sin SMTP aún.
+
+**Pendiente:** SMTP/correo + DNS (recuperación contraseña, magic link); M3 (correo), M2 (calendario),
+M4 (banco contexto), M6 (asistente IA). Mejoras M1: filtros por mes, escritura a Notion.
+
+**Deploy:** ver `docs/transversal/infra-devops.md`. Gotchas resueltos documentados en la memoria del proyecto.
 
 ## Setup
 1. `cp .env.example .env.local` y rellenar (Supabase, Notion, Google OAuth, IMAP, CRON_SECRET, cifrado).
