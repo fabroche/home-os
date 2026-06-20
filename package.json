@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "worker": "tsx worker/index.ts",
+    "inspect:notion": "tsx scripts/inspect-notion.ts",
     "format": "prettier --write ."
   },
   "dependencies": {
