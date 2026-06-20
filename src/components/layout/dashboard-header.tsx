@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { logout } from "@/lib/actions/auth";
+import { LogoutButton } from "@/components/layout/logout-button";
 
 const NAV = [
   { href: "/", label: "Inicio" },
@@ -19,9 +19,7 @@ export function DashboardHeader() {
           </Link>
         ))}
       </nav>
-      <form action={logout}>
-        <button className="text-sm text-muted-foreground hover:text-foreground">Salir</button>
-      </form>
+      <LogoutButton />
     </header>
   );
 }
