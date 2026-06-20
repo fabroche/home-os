@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DashboardHeader } from "@/components/layout/dashboard-header";
 
 const MODULOS = [
   { href: "/finanzas", titulo: "Finanzas", desc: "Notion + facturas del correo" },
@@ -9,6 +10,8 @@ const MODULOS = [
 
 export default function HomePage() {
   return (
+    <>
+    <DashboardHeader />
     <main className="mx-auto max-w-3xl px-6 py-16">
       <h1 className="text-3xl font-semibold tracking-tight">home-os</h1>
       <p className="mt-2 text-muted-foreground">
@@ -27,5 +30,6 @@ export default function HomePage() {
         ))}
       </div>
     </main>
+    </>
   );
 }

@@ -54,6 +54,13 @@ Usuario; sistema (worker con service role).
 - [ ] Las credenciales de cuentas no aparecen en texto plano en la BD.
 - [ ] `/api/cron/*` rechaza peticiones sin `CRON_SECRET`.
 
+## Estado de implementación (hecho)
+- **Método elegido**: email + contraseña, **usuario único pre-creado** (sin SMTP). Magic link/recuperación se añaden cuando se monte el SMTP del mailbox.
+- `src/proxy.ts` (Next 16) + `src/lib/supabase/middleware.ts`: refrescan sesión y **protegen todas las rutas** (sin sesión → `/login`); `/api/*` y assets excluidos. Verificado: `/finanzas` y `/` → 307 a `/login`.
+- `src/lib/actions/auth.ts`: `login` (Zod + `signInWithPassword`) y `logout`. `src/app/login/page.tsx` (form con `useActionState`). Cabecera con "Salir" (`components/layout/dashboard-header`).
+- **Decisión interim**: los Server Components leen datos con `service_role` (server-side); la **seguridad la da el login + middleware** (single-user). Las políticas RLS por `user_id` quedan habilitadas como defensa y se activarán de lleno si se pasa a multi-usuario (requeriría poblar `user_id` en el sync).
+- **Pendiente del usuario**: crear el usuario único en Supabase (Studio → Authentication → Add user) y `DISABLE_SIGNUP=true` en el stack Supabase.
+
 ## 9. Riesgos y decisiones abiertas
 - Gestión/rotación de `ACCOUNT_ENCRYPTION_KEY` (si se pierde, se reconectan cuentas).
 - Confirmar que Supabase Auth magic link cubre tu caso (alternativa: passkey).
