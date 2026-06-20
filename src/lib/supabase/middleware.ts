@@ -12,8 +12,14 @@ export async function updateSession(request: NextRequest) {
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  // Sin configuración de Supabase no bloqueamos (p. ej. dev sin credenciales).
-  if (!url || !anon) return supabaseResponse;
+  // Sin config no podemos validar sesión → FAIL-CLOSED: todo a /login (nunca dejar
+  // la app abierta por env faltante en el build). /login pasa para no hacer loop.
+  if (!url || !anon) {
+    if (request.nextUrl.pathname === "/login") return supabaseResponse;
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    return NextResponse.redirect(redirectUrl);
+  }
 
   const supabase = createServerClient(url, anon, {
     cookies: {
