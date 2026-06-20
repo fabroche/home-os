@@ -12,7 +12,8 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Solo dependencias de producción (sin vitest/vite/playwright/etc.). tsx es runtime dep.
+RUN npm ci --omit=dev
 
 FROM base AS runner
 ENV NODE_ENV=production
