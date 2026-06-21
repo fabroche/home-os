@@ -17,4 +17,4 @@ La documentación exhaustiva está en `docs/`; aquí van chuletas y enrutado.
 | Calidad / tests | `docs/transversal/calidad-y-pruebas.md` |
 
 ## Subagentes disponibles (`.claude/agents/`)
-`frontend` · `backend` · `devops` · `backoffice` · `notion-integration` · `finanzas-data` · `qa-testing` · `ai-agente`
+`frontend` · `backend` · `devops` · `backoffice` · `calendario` · `notion-integration` · `finanzas-data` · `qa-testing` · `ai-agente`
