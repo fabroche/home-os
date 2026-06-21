@@ -85,11 +85,13 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
   Header persistente (grupo `(dashboard)`) + **loading skeletons a medida**. **Storybook 10** (stories + a11y +
   toggle de tema). Ver `docs/transversal/sistema-de-diseno.md`.
 
-**Pendiente (prerequisitos manuales para la escritura M1):** activar **Insert/Update content** en la
-integración de Notion + columna files `comprobante` en Presupuesto + `NOTION_API_KEY` en el contenedor `app` +
-aplicar `0003_finanzas_write.sql` en Supabase.
+Los prerequisitos manuales de la escritura M1 (capacidades Insert/Update en Notion, columna `comprobante`,
+`NOTION_API_KEY` en la app, migración `0003`) están **completados** y la escritura funciona en prod.
+
 **Roadmap:** SMTP/correo + DNS; **M6** (asistente IA, consume M4), luego **M3** (correo) y **M2** (calendario);
 **M5** (dashboard). Orden por dependencias: M4✓ → M6 → M3/M2 → M5.
+**Backlog M1 (sugerencias):** filtro por mes/rango de fechas y exportar CSV en movimientos; conciliación
+factura↔gasto (M3/M6). Ver `docs/modules/M1-finanzas.md`.
 
 **Deploy:** ver `docs/transversal/infra-devops.md`. Gotchas resueltos documentados en la memoria del proyecto.
 

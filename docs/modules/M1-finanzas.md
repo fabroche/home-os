@@ -11,8 +11,14 @@
 > editar `status` (Pendiente/Pagado), alta de gastos/deudas con **firma de importe** (gasto/deuda negativo,
 > ingreso positivo), subida de **factura/comprobante** a Storage público + enlace externo en Notion, y **sync
 > manual**. Deudas = **saldo neto por persona** (deuda negativa + pagos positivos → pendiente / por cobrar).
+> Tabla de **movimientos** con búsqueda, filtros (tipo/categoría/estado), orden por columnas y "cargar más".
 > Capa de escritura Notion: `lib/notion/{mutations,properties-write}.ts`. Migración `0003_finanzas_write.sql`.
-> **Pendiente:** filtros por mes; conciliación factura↔gasto (requiere M3/M6).
+>
+> **Backlog / mejoras sugeridas (no implementadas):**
+> - Filtro por **mes / rango de fechas** en movimientos (hoy: tipo/categoría/estado/búsqueda).
+> - **Exportar** movimientos (CSV).
+> - **Conciliación factura↔gasto** (requiere M3/M6).
+> - Paginación server-side si el volumen crece (hoy es client-side en memoria, suficiente single-user).
 
 ## 1. Propósito y alcance
 Centralizar las finanzas personales: leer/escribir las **DBs de finanzas de Notion**, espejarlas en
