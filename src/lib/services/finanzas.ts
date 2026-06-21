@@ -80,3 +80,16 @@ export async function listDeudas(): Promise<Deuda[]> {
   if (error) throw new Error(`listDeudas: ${error.message}`);
   return (data as DeudaRow[]).map(rowToDeuda);
 }
+
+/** Marca de la última sincronización Notion→Supabase (la más reciente entre fuentes). */
+export async function ultimoSync(): Promise<string | null> {
+  const sb = createSupabaseServiceClient();
+  const { data, error } = await sb
+    .from("sync_state")
+    .select("last_run")
+    .order("last_run", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`ultimoSync: ${error.message}`);
+  return (data?.last_run as string | null) ?? null;
+}

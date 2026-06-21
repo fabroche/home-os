@@ -1,6 +1,7 @@
-import { listMovimientos, listDeudas, resumen } from "@/lib/services/finanzas";
+import { listMovimientos, listDeudas, resumen, ultimoSync } from "@/lib/services/finanzas";
 import { gastosPorCategoria, porMes, resumenDeudas } from "@/lib/finanzas/aggregations";
 import { BarList } from "@/components/finanzas/bar-list";
+import { SyncButton } from "@/components/finanzas/sync-button";
 import { Card, CardLabel } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedNumber } from "@/components/ui/count-up";
@@ -50,7 +51,11 @@ function Kpi({
 }
 
 export default async function FinanzasPage() {
-  const [movimientos, deudas] = await Promise.all([listMovimientos(), listDeudas()]);
+  const [movimientos, deudas, lastSync] = await Promise.all([
+    listMovimientos(),
+    listDeudas(),
+    ultimoSync(),
+  ]);
   const r = resumen(movimientos);
   const porCat = gastosPorCategoria(movimientos);
   const meses = porMes(movimientos);
@@ -63,12 +68,17 @@ export default async function FinanzasPage() {
     <main className="container-app max-w-5xl py-12">
       {/* Encabezado */}
       <Reveal>
-        <h1 className="text-4xl">
-          <span className="serif-accent text-primary">Finanzas</span> al detalle
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {r.total} movimientos · datos desde Supabase, sincronizados desde Notion.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-4xl">
+              <span className="serif-accent text-primary">Finanzas</span> al detalle
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {r.total} movimientos · datos desde Supabase, sincronizados desde Notion.
+            </p>
+          </div>
+          <SyncButton lastSync={lastSync} />
+        </div>
       </Reveal>
 
       {/* KPIs */}
@@ -77,7 +87,7 @@ export default async function FinanzasPage() {
           <Kpi label="Ingresos" value={r.ingresos} accent="text-income" />
           <Kpi label="Gastos" value={r.gastos} accent="text-expense" />
           <Kpi label="Balance" value={r.balance} accent="text-primary" />
-          <Kpi label="Deudas" value={rd.total} accent="text-debt" />
+          <Kpi label="Deudas por pagar" value={rd.total} accent="text-debt" />
         </div>
       </Reveal>
 
@@ -125,22 +135,53 @@ export default async function FinanzasPage() {
       <Reveal>
         <section className="mt-10">
           <h2 className="mb-3 text-lg font-semibold">Deudas personales</h2>
-          <div className="grid gap-6 lg:grid-cols-2">
+
+          {/* Saldos: pendiente por pagar vs a favor por cobrar */}
+          <div className="grid gap-4 sm:grid-cols-2">
             <Card>
-              <CardLabel className="mb-3">Por persona</CardLabel>
-              <BarList
-                items={rd.porPersona.map((p) => ({ label: p.persona, value: p.total }))}
-                format={eur}
-                barClassName="bg-debt"
-              />
+              <CardLabel>Por pagar (debes)</CardLabel>
+              <div className="mt-2 text-3xl font-semibold nums text-debt">{eur(rd.total)}</div>
             </Card>
+            <Card>
+              <CardLabel>A favor · por cobrar</CardLabel>
+              <div className="mt-2 text-3xl font-semibold nums text-income">
+                {eur(rd.totalPorCobrar)}
+              </div>
+            </Card>
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardLabel className="mb-3">Pendiente por persona</CardLabel>
+              {rd.porPersona.length > 0 ? (
+                <BarList
+                  items={rd.porPersona.map((p) => ({ label: p.persona, value: p.total }))}
+                  format={eur}
+                  barClassName="bg-debt"
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin deudas pendientes. 🎉</p>
+              )}
+
+              {rd.porCobrar.length > 0 && (
+                <>
+                  <CardLabel className="mb-3 mt-6">A favor por persona</CardLabel>
+                  <BarList
+                    items={rd.porCobrar.map((p) => ({ label: p.persona, value: p.total }))}
+                    format={eur}
+                    barClassName="bg-income"
+                  />
+                </>
+              )}
+            </Card>
+
             <div className="overflow-x-auto rounded-xl border border-border">
               <table className="w-full text-sm">
                 <thead className="bg-secondary text-left text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5 font-medium">Concepto</th>
                     <th className="px-4 py-2.5 font-medium">Persona</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Valor</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Movimiento</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -148,8 +189,12 @@ export default async function FinanzasPage() {
                     <tr key={d.notionPageId} className="border-t border-border transition-colors hover:bg-accent/50">
                       <td className="px-4 py-2.5">{d.concepto || "—"}</td>
                       <td className="px-4 py-2.5">{d.persona ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-right nums">
-                        {d.valor != null ? eur(Math.abs(d.valor)) : "—"}
+                      <td
+                        className={`px-4 py-2.5 text-right nums ${
+                          d.valor == null ? "" : d.valor < 0 ? "text-debt" : "text-income"
+                        }`}
+                      >
+                        {d.valor != null ? eur(d.valor) : "—"}
                       </td>
                     </tr>
                   ))}
