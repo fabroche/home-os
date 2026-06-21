@@ -1,9 +1,11 @@
 import "@/lib/server-guard";
 import { queryDatabase } from "@/lib/notion/databases";
+import { retrievePage } from "@/lib/notion/mutations";
 import { PRESUPUESTO, DEUDAS } from "@/lib/notion/schema";
 import { toMovimiento } from "@/lib/notion/mappers/presupuesto";
 import { toDeuda } from "@/lib/notion/mappers/deuda";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import type { Movimiento, Deuda } from "@/types/finanzas";
 
 /**
  * Sync Notion → Supabase (modelo híbrido). Lee las DBs de Notion (paginado +
@@ -13,26 +15,60 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * por `sync_state.last_edited` y el borrado de páginas eliminadas en Notion son
  * mejoras futuras (TODO). Lo invoca el worker (cron) y el script `sync:finanzas`.
  */
+const movimientoRow = (m: Movimiento, now: string) => ({
+  notion_page_id: m.notionPageId,
+  nombre: m.nombre,
+  fecha: m.fecha,
+  importe: m.importe,
+  categoria: m.categoria,
+  tipo: m.tipo,
+  estado: m.estado,
+  flujo: m.flujo,
+  facturas: m.facturas,
+  comprobantes: m.comprobantes,
+  url: m.url ?? null,
+  ultima_edicion: m.ultimaEdicion,
+  synced_at: now,
+});
+
+const deudaRow = (d: Deuda, now: string) => ({
+  notion_page_id: d.notionPageId,
+  concepto: d.concepto,
+  fecha_creacion: d.fechaCreacion,
+  valor: d.valor,
+  persona: d.persona,
+  url: d.url ?? null,
+  ultima_edicion: d.ultimaEdicion,
+  synced_at: now,
+});
+
+/** Re-sincroniza una sola página de Presupuesto tras escribir en Notion. */
+export async function syncMovimientoById(pageId: string): Promise<void> {
+  const sb = createSupabaseServiceClient();
+  const m = toMovimiento(await retrievePage(pageId));
+  const { error } = await sb
+    .from("movimiento")
+    .upsert([movimientoRow(m, new Date().toISOString())], { onConflict: "notion_page_id" });
+  if (error) throw new Error(`syncMovimientoById: ${error.message}`);
+}
+
+/** Re-sincroniza una sola página de Deudas_Personales tras escribir en Notion. */
+export async function syncDeudaById(pageId: string): Promise<void> {
+  const sb = createSupabaseServiceClient();
+  const d = toDeuda(await retrievePage(pageId));
+  const { error } = await sb
+    .from("deuda")
+    .upsert([deudaRow(d, new Date().toISOString())], { onConflict: "notion_page_id" });
+  if (error) throw new Error(`syncDeudaById: ${error.message}`);
+}
+
 export async function syncFinanzas() {
   const sb = createSupabaseServiceClient();
   const now = new Date().toISOString();
 
   // --- Presupuesto → movimiento ---
   const movs = (await queryDatabase(PRESUPUESTO.id)).map(toMovimiento);
-  const movRows = movs.map((m) => ({
-    notion_page_id: m.notionPageId,
-    nombre: m.nombre,
-    fecha: m.fecha,
-    importe: m.importe,
-    categoria: m.categoria,
-    tipo: m.tipo,
-    estado: m.estado,
-    flujo: m.flujo,
-    facturas: m.facturas,
-    url: m.url ?? null,
-    ultima_edicion: m.ultimaEdicion,
-    synced_at: now,
-  }));
+  const movRows = movs.map((m) => movimientoRow(m, now));
   if (movRows.length > 0) {
     const { error } = await sb.from("movimiento").upsert(movRows, { onConflict: "notion_page_id" });
     if (error) throw new Error(`upsert movimiento: ${error.message}`);
@@ -40,16 +76,7 @@ export async function syncFinanzas() {
 
   // --- Deudas_Personales → deuda ---
   const deudas = (await queryDatabase(DEUDAS.id)).map(toDeuda);
-  const deudaRows = deudas.map((d) => ({
-    notion_page_id: d.notionPageId,
-    concepto: d.concepto,
-    fecha_creacion: d.fechaCreacion,
-    valor: d.valor,
-    persona: d.persona,
-    url: d.url ?? null,
-    ultima_edicion: d.ultimaEdicion,
-    synced_at: now,
-  }));
+  const deudaRows = deudas.map((d) => deudaRow(d, now));
   if (deudaRows.length > 0) {
     const { error } = await sb.from("deuda").upsert(deudaRows, { onConflict: "notion_page_id" });
     if (error) throw new Error(`upsert deuda: ${error.message}`);

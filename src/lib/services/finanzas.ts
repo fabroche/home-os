@@ -22,6 +22,7 @@ type MovimientoRow = {
   estado: string | null;
   flujo: string;
   facturas: string[] | null;
+  comprobantes: string[] | null;
   url: string | null;
   ultima_edicion: string;
 };
@@ -46,6 +47,7 @@ function rowToMovimiento(r: MovimientoRow): Movimiento {
     tipo: r.tipo,
     estado: r.estado,
     facturas: r.facturas ?? [],
+    comprobantes: r.comprobantes ?? [],
     flujo: r.flujo,
     url: r.url ?? undefined,
     ultimaEdicion: r.ultima_edicion,

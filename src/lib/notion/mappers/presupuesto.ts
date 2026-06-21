@@ -16,6 +16,7 @@ export function toMovimiento(page: PageObjectResponse): Movimiento {
     tipo,
     estado: readStatus(p[PRESUPUESTO.props.estado]),
     facturas: readFiles(p[PRESUPUESTO.props.facturas]),
+    comprobantes: readFiles(p[PRESUPUESTO.props.comprobantes]),
     flujo: flujoDeTipo(tipo),
     url: page.url,
     ultimaEdicion: page.last_edited_time,

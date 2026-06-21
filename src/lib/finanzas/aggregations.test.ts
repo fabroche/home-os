@@ -12,6 +12,7 @@ function mov(flujo: Movimiento["flujo"], importe: number | null): Movimiento {
     tipo: null,
     estado: null,
     facturas: [],
+    comprobantes: [],
     flujo,
     ultimaEdicion: "2026-06-01T00:00:00.000Z",
   };

@@ -2,8 +2,10 @@ import { listMovimientos, listDeudas, resumen, ultimoSync } from "@/lib/services
 import { gastosPorCategoria, porMes, resumenDeudas } from "@/lib/finanzas/aggregations";
 import { BarList } from "@/components/finanzas/bar-list";
 import { SyncButton } from "@/components/finanzas/sync-button";
+import { MovimientosTable } from "@/components/finanzas/movimientos-table";
+import { NuevoMovimiento } from "@/components/finanzas/nuevo-movimiento";
+import { NuevaDeuda } from "@/components/finanzas/nueva-deuda";
 import { Card, CardLabel } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { AnimatedNumber } from "@/components/ui/count-up";
 import { Reveal } from "@/components/motion/reveal";
 
@@ -17,18 +19,6 @@ const mesLargo = (mes: string) => {
   const [y, m] = mes.split("-");
   const d = new Date(Number(y), Number(m) - 1, 1);
   return d.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
-};
-
-const COLOR_FLUJO: Record<string, string> = {
-  ingreso: "text-income",
-  gasto: "text-expense",
-  deuda: "text-debt",
-};
-
-const TONO_FLUJO: Record<string, "income" | "expense" | "debt" | "neutral"> = {
-  ingreso: "income",
-  gasto: "expense",
-  deuda: "debt",
 };
 
 function Kpi({
@@ -135,6 +125,9 @@ export default async function FinanzasPage() {
       <Reveal>
         <section className="mt-10">
           <h2 className="mb-3 text-lg font-semibold">Deudas personales</h2>
+          <div className="mb-4">
+            <NuevaDeuda />
+          </div>
 
           {/* Saldos: pendiente por pagar vs a favor por cobrar */}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -215,34 +208,10 @@ export default async function FinanzasPage() {
       {/* Movimientos recientes */}
       <Reveal>
         <h2 className="mt-10 mb-3 text-lg font-semibold">Movimientos recientes</h2>
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary text-left text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Fecha</th>
-                <th className="px-4 py-2.5 font-medium">Nombre</th>
-                <th className="px-4 py-2.5 font-medium">Categoría</th>
-                <th className="px-4 py-2.5 font-medium">Tipo</th>
-                <th className="px-4 py-2.5 text-right font-medium">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recientes.map((m) => (
-                <tr key={m.notionPageId} className="border-t border-border transition-colors hover:bg-accent/50">
-                  <td className="px-4 py-2.5 nums text-muted-foreground">{m.fecha ?? "—"}</td>
-                  <td className="px-4 py-2.5">{m.nombre || "—"}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{m.categoria ?? "—"}</td>
-                  <td className="px-4 py-2.5">
-                    {m.tipo ? <Badge tone={TONO_FLUJO[m.flujo] ?? "neutral"}>{m.tipo}</Badge> : "—"}
-                  </td>
-                  <td className={`px-4 py-2.5 text-right nums font-medium ${COLOR_FLUJO[m.flujo] ?? ""}`}>
-                    {m.importe != null ? eur(m.importe) : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mb-4">
+          <NuevoMovimiento />
         </div>
+        <MovimientosTable movimientos={recientes} />
       </Reveal>
     </main>
   );

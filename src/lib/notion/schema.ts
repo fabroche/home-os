@@ -15,6 +15,7 @@ export const PRESUPUESTO = {
     tipo: "type",
     estado: "status",
     facturas: "invoices",
+    comprobantes: "comprobante",
   },
 } as const;
 
