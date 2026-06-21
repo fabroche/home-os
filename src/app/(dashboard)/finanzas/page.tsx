@@ -1,6 +1,10 @@
 import { listMovimientos, listDeudas, resumen } from "@/lib/services/finanzas";
 import { gastosPorCategoria, porMes, resumenDeudas } from "@/lib/finanzas/aggregations";
 import { BarList } from "@/components/finanzas/bar-list";
+import { Card, CardLabel } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { AnimatedNumber } from "@/components/ui/count-up";
+import { Reveal } from "@/components/motion/reveal";
 
 // Lee del espejo en Supabase (el worker sincroniza desde Notion).
 export const dynamic = "force-dynamic";
@@ -15,13 +19,34 @@ const mesLargo = (mes: string) => {
 };
 
 const COLOR_FLUJO: Record<string, string> = {
-  ingreso: "text-[var(--income)]",
-  gasto: "text-[var(--expense)]",
-  deuda: "text-amber-600",
+  ingreso: "text-income",
+  gasto: "text-expense",
+  deuda: "text-debt",
 };
 
-function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-lg border p-5">{children}</div>;
+const TONO_FLUJO: Record<string, "income" | "expense" | "debt" | "neutral"> = {
+  ingreso: "income",
+  gasto: "expense",
+  deuda: "debt",
+};
+
+function Kpi({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: string;
+}) {
+  return (
+    <Card>
+      <CardLabel>{label}</CardLabel>
+      <div className={`mt-2 text-3xl font-semibold nums ${accent ?? ""}`}>
+        <AnimatedNumber value={value} currency="EUR" />
+      </div>
+    </Card>
+  );
 }
 
 export default async function FinanzasPage() {
@@ -35,140 +60,145 @@ export default async function FinanzasPage() {
     .slice(0, 15);
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
-      <h1 className="text-2xl font-semibold">Finanzas</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {r.total} movimientos · datos desde Supabase, sincronizados desde Notion.
-      </p>
+    <main className="container-app max-w-5xl py-12">
+      {/* Encabezado */}
+      <Reveal>
+        <h1 className="text-4xl">
+          <span className="serif-accent text-primary">Finanzas</span> al detalle
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {r.total} movimientos · datos desde Supabase, sincronizados desde Notion.
+        </p>
+      </Reveal>
 
       {/* KPIs */}
-      <div className="mt-8 grid gap-4 sm:grid-cols-4">
-        <Card>
-          <div className="text-sm text-muted-foreground">Ingresos</div>
-          <div className="mt-1 text-2xl font-semibold text-[var(--income)]">{eur(r.ingresos)}</div>
-        </Card>
-        <Card>
-          <div className="text-sm text-muted-foreground">Gastos</div>
-          <div className="mt-1 text-2xl font-semibold text-[var(--expense)]">{eur(r.gastos)}</div>
-        </Card>
-        <Card>
-          <div className="text-sm text-muted-foreground">Balance</div>
-          <div className="mt-1 text-2xl font-semibold">{eur(r.balance)}</div>
-        </Card>
-        <Card>
-          <div className="text-sm text-muted-foreground">Deudas</div>
-          <div className="mt-1 text-2xl font-semibold text-amber-600">{eur(rd.total)}</div>
-        </Card>
-      </div>
+      <Reveal delay={0.05}>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Kpi label="Ingresos" value={r.ingresos} accent="text-income" />
+          <Kpi label="Gastos" value={r.gastos} accent="text-expense" />
+          <Kpi label="Balance" value={r.balance} accent="text-primary" />
+          <Kpi label="Deudas" value={rd.total} accent="text-debt" />
+        </div>
+      </Reveal>
 
       {/* Categorías + Mensual */}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <section>
-          <h2 className="mb-3 text-lg font-medium">Gastos por categoría</h2>
-          <Card>
-            <BarList items={porCat.map((c) => ({ label: c.categoria, value: c.total }))} format={eur} />
-          </Card>
-        </section>
+        <Reveal>
+          <section>
+            <h2 className="mb-3 text-lg font-semibold">Gastos por categoría</h2>
+            <Card>
+              <BarList items={porCat.map((c) => ({ label: c.categoria, value: c.total }))} format={eur} />
+            </Card>
+          </section>
+        </Reveal>
 
-        <section>
-          <h2 className="mb-3 text-lg font-medium">Resumen mensual</h2>
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-secondary text-left text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Mes</th>
-                  <th className="px-4 py-2 text-right font-medium">Ingresos</th>
-                  <th className="px-4 py-2 text-right font-medium">Gastos</th>
-                  <th className="px-4 py-2 text-right font-medium">Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {meses.map((m) => (
-                  <tr key={m.mes} className="border-t">
-                    <td className="px-4 py-2 capitalize">{mesLargo(m.mes)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-[var(--income)]">{eur(m.ingresos)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-[var(--expense)]">{eur(m.gastos)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{eur(m.balance)}</td>
+        <Reveal delay={0.05}>
+          <section>
+            <h2 className="mb-3 text-lg font-semibold">Resumen mensual</h2>
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-sm">
+                <thead className="bg-secondary text-left text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">Mes</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Ingresos</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Gastos</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Balance</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                </thead>
+                <tbody>
+                  {meses.map((m) => (
+                    <tr key={m.mes} className="border-t border-border transition-colors hover:bg-accent/50">
+                      <td className="px-4 py-2.5 capitalize">{mesLargo(m.mes)}</td>
+                      <td className="px-4 py-2.5 text-right nums text-income">{eur(m.ingresos)}</td>
+                      <td className="px-4 py-2.5 text-right nums text-expense">{eur(m.gastos)}</td>
+                      <td className="px-4 py-2.5 text-right nums font-medium">{eur(m.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </Reveal>
       </div>
 
       {/* Deudas */}
-      <section className="mt-10">
-        <h2 className="mb-3 text-lg font-medium">Deudas personales</h2>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <div className="mb-3 text-sm text-muted-foreground">Por persona</div>
-            <BarList
-              items={rd.porPersona.map((p) => ({ label: p.persona, value: p.total }))}
-              format={eur}
-              barClassName="bg-amber-500"
-            />
-          </Card>
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-secondary text-left text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Concepto</th>
-                  <th className="px-4 py-2 font-medium">Persona</th>
-                  <th className="px-4 py-2 text-right font-medium">Valor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deudas.map((d) => (
-                  <tr key={d.notionPageId} className="border-t">
-                    <td className="px-4 py-2">{d.concepto || "—"}</td>
-                    <td className="px-4 py-2">{d.persona ?? "—"}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">
-                      {d.valor != null ? eur(Math.abs(d.valor)) : "—"}
-                    </td>
-                  </tr>
-                ))}
-                {deudas.length === 0 && (
+      <Reveal>
+        <section className="mt-10">
+          <h2 className="mb-3 text-lg font-semibold">Deudas personales</h2>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardLabel className="mb-3">Por persona</CardLabel>
+              <BarList
+                items={rd.porPersona.map((p) => ({ label: p.persona, value: p.total }))}
+                format={eur}
+                barClassName="bg-debt"
+              />
+            </Card>
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-sm">
+                <thead className="bg-secondary text-left text-muted-foreground">
                   <tr>
-                    <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
-                      Sin deudas.
-                    </td>
+                    <th className="px-4 py-2.5 font-medium">Concepto</th>
+                    <th className="px-4 py-2.5 font-medium">Persona</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Valor</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {deudas.map((d) => (
+                    <tr key={d.notionPageId} className="border-t border-border transition-colors hover:bg-accent/50">
+                      <td className="px-4 py-2.5">{d.concepto || "—"}</td>
+                      <td className="px-4 py-2.5">{d.persona ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right nums">
+                        {d.valor != null ? eur(Math.abs(d.valor)) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  {deudas.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
+                        Sin deudas.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </Reveal>
 
       {/* Movimientos recientes */}
-      <h2 className="mt-10 mb-3 text-lg font-medium">Movimientos recientes</h2>
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Categoría</th>
-              <th className="px-4 py-2 font-medium">Tipo</th>
-              <th className="px-4 py-2 text-right font-medium">Importe</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recientes.map((m) => (
-              <tr key={m.notionPageId} className="border-t">
-                <td className="px-4 py-2 tabular-nums text-muted-foreground">{m.fecha ?? "—"}</td>
-                <td className="px-4 py-2">{m.nombre || "—"}</td>
-                <td className="px-4 py-2">{m.categoria ?? "—"}</td>
-                <td className="px-4 py-2">{m.tipo ?? "—"}</td>
-                <td className={`px-4 py-2 text-right tabular-nums ${COLOR_FLUJO[m.flujo] ?? ""}`}>
-                  {m.importe != null ? eur(m.importe) : "—"}
-                </td>
+      <Reveal>
+        <h2 className="mt-10 mb-3 text-lg font-semibold">Movimientos recientes</h2>
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-secondary text-left text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2.5 font-medium">Fecha</th>
+                <th className="px-4 py-2.5 font-medium">Nombre</th>
+                <th className="px-4 py-2.5 font-medium">Categoría</th>
+                <th className="px-4 py-2.5 font-medium">Tipo</th>
+                <th className="px-4 py-2.5 text-right font-medium">Importe</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {recientes.map((m) => (
+                <tr key={m.notionPageId} className="border-t border-border transition-colors hover:bg-accent/50">
+                  <td className="px-4 py-2.5 nums text-muted-foreground">{m.fecha ?? "—"}</td>
+                  <td className="px-4 py-2.5">{m.nombre || "—"}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{m.categoria ?? "—"}</td>
+                  <td className="px-4 py-2.5">
+                    {m.tipo ? <Badge tone={TONO_FLUJO[m.flujo] ?? "neutral"}>{m.tipo}</Badge> : "—"}
+                  </td>
+                  <td className={`px-4 py-2.5 text-right nums font-medium ${COLOR_FLUJO[m.flujo] ?? ""}`}>
+                    {m.importe != null ? eur(m.importe) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Reveal>
     </main>
   );
 }

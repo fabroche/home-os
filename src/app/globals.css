@@ -2,37 +2,109 @@
 @import "tw-animate-css";
 
 /*
-  Tailwind v4 — CSS-first. NO existe tailwind.config.js.
-  Tokens y variables shadcn (base slate, new-york). Sitio light-only (uso personal).
+  home-os · Sistema de diseño (Tailwind v4, CSS-first — NO hay tailwind.config.js).
+  Personalidad editorial: Inter Tight (cuerpo/datos) + Instrument Serif italic (acentos),
+  marca violeta eléctrica (#4928fd), formas pill, gradientes suaves, light + dark.
+  Inspirado en la dirección de Awake Agency, adaptado a un dashboard de datos legible.
   Los warnings de lint en @theme/@apply son esperados.
 */
 
+@custom-variant dark (&:is(.dark *));
+
+/* ------------------------------------------------------------------ */
+/* Tokens — tema claro                                                 */
+/* ------------------------------------------------------------------ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
+  --radius: 0.75rem;
+
+  --background: oklch(0.99 0.003 250);
+  --foreground: oklch(0.18 0.02 265);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
+  --card-foreground: oklch(0.18 0.02 265);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
+  --popover-foreground: oklch(0.18 0.02 265);
+
+  /* Marca: violeta eléctrico */
+  --primary: #4928fd;
+  --primary-foreground: oklch(0.99 0 0);
+
   --secondary: oklch(0.968 0.007 247.896);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
   --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
+  --accent: oklch(0.962 0.018 277);
+  --accent-foreground: #2a17a8;
+
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --border: oklch(0.922 0.013 255.508);
+  --input: oklch(0.922 0.013 255.508);
+  --ring: #4928fd;
+
   /* Tokens de dominio (semánticos para finanzas/calendario) */
-  --income: oklch(0.6 0.13 160);
+  --income: oklch(0.62 0.14 162);
   --expense: oklch(0.577 0.245 27.325);
+  --debt: oklch(0.72 0.16 70);
+
+  /* Paleta lúdica de acento (decorativa) */
+  --brand: #4928fd;
+  --iris: #ba81ee;
+  --azure: #70b5ff;
+  --tangerine: #ffaf68;
+  --lime: #79d45e;
+  --blush: #f4889a;
+
+  /* Stops de gradiente suave (blobs de fondo) */
+  --glow-cool: #d9f3fc;
+  --glow-warm: #fdf1d3;
+
+  --shadow-soft: 0 1px 2px rgb(16 12 60 / 0.04), 0 8px 28px -12px rgb(73 40 253 / 0.12);
+  --shadow-pill: 0 1px 3px rgb(0 0 0 / 0.08);
 }
 
+/* ------------------------------------------------------------------ */
+/* Tokens — tema oscuro                                                */
+/* ------------------------------------------------------------------ */
+.dark {
+  --background: oklch(0.16 0.012 265);
+  --foreground: oklch(0.97 0.004 248);
+  --card: oklch(0.21 0.018 266);
+  --card-foreground: oklch(0.97 0.004 248);
+  --popover: oklch(0.21 0.018 266);
+  --popover-foreground: oklch(0.97 0.004 248);
+
+  --primary: #6a4bff;
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.27 0.02 263);
+  --secondary-foreground: oklch(0.97 0.004 248);
+  --muted: oklch(0.27 0.02 263);
+  --muted-foreground: oklch(0.71 0.03 257);
+  --accent: oklch(0.3 0.04 274);
+  --accent-foreground: oklch(0.97 0.004 248);
+
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #6a4bff;
+
+  --income: oklch(0.74 0.15 162);
+  --expense: oklch(0.7 0.19 22);
+  --debt: oklch(0.8 0.15 75);
+
+  --glow-cool: #1f3a44;
+  --glow-warm: #443f32;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 30px -14px rgb(106 75 255 / 0.35);
+  --shadow-pill: 0 1px 3px rgb(0 0 0 / 0.5);
+}
+
+/* ------------------------------------------------------------------ */
+/* Mapeo a utilidades de Tailwind                                      */
+/* ------------------------------------------------------------------ */
 @theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument), Georgia, "Times New Roman", serif;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -51,20 +123,118 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
   --color-income: var(--income);
   --color-expense: var(--expense);
+  --color-debt: var(--debt);
+
+  --color-brand: var(--brand);
+  --color-iris: var(--iris);
+  --color-azure: var(--azure);
+  --color-tangerine: var(--tangerine);
+  --color-lime: var(--lime);
+  --color-blush: var(--blush);
+  --color-glow-cool: var(--glow-cool);
+  --color-glow-warm: var(--glow-warm);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-pill: var(--shadow-pill);
+
+  --animate-rise: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
+/* ------------------------------------------------------------------ */
+/* Base                                                                */
+/* ------------------------------------------------------------------ */
 * {
   border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans, system-ui, sans-serif);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Escala tipográfica editorial — titulares sans con tracking ceñido */
+h1 {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+h2 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+h3,
+h4 {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* ------------------------------------------------------------------ */
+/* Utilidades de marca                                                 */
+/* ------------------------------------------------------------------ */
+
+/* Acento serif en cursiva (palabras destacadas dentro de un titular) */
+@utility serif-accent {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* Contenedor centrado del dashboard */
+@utility container-app {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+/* Blob de gradiente suave para fondos de sección */
+@utility glow-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  background: linear-gradient(
+    115deg,
+    var(--glow-cool),
+    transparent 45%,
+    transparent 55%,
+    var(--glow-warm)
+  );
+  filter: blur(80px);
+  opacity: 0.7;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+/* Números tabulares para datos financieros */
+@utility nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }

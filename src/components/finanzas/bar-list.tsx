@@ -6,7 +6,7 @@ type Item = { label: string; value: number };
 export function BarList({
   items,
   format = (n) => String(n),
-  barClassName = "bg-[var(--expense)]",
+  barClassName = "bg-primary",
 }: {
   items: Item[];
   format?: (n: number) => string;
@@ -26,9 +26,9 @@ export function BarList({
           <span className="truncate text-muted-foreground" title={i.label}>
             {i.label}
           </span>
-          <span className="h-2 rounded bg-secondary">
+          <span className="h-2.5 overflow-hidden rounded-full bg-secondary">
             <span
-              className={cn("block h-2 rounded", barClassName)}
+              className={cn("block h-2.5 rounded-full transition-[width] duration-500 ease-out", barClassName)}
               style={{ width: `${Math.max(2, (i.value / max) * 100)}%` }}
             />
           </span>

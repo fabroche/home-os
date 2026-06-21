@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -27,34 +28,51 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-6">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 rounded-lg border p-6">
-        <h1 className="text-xl font-semibold">home-os</h1>
-        <p className="text-sm text-muted-foreground">Inicia sesión para continuar.</p>
-        <input
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
-          placeholder="Email"
-          className="w-full rounded-md border px-3 py-2 text-sm"
-        />
-        <input
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          placeholder="Contraseña"
-          className="w-full rounded-md border px-3 py-2 text-sm"
-        />
-        {error && <p className="text-sm text-[var(--expense)]">{error}</p>}
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
-        >
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden px-6">
+      <div className="glow-bg" aria-hidden />
+
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-sm space-y-5 rounded-2xl border border-border bg-card p-8 shadow-soft"
+      >
+        <div className="flex items-center gap-2">
+          <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground text-sm font-semibold">
+            h
+          </span>
+          <span className="text-lg font-semibold tracking-tight">home·os</span>
+        </div>
+
+        <div>
+          <h1 className="text-2xl">
+            Hola de <span className="serif-accent text-primary">nuevo</span>
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">Inicia sesión para continuar.</p>
+        </div>
+
+        <div className="space-y-3">
+          <input
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="Email"
+            className="w-full rounded-full border border-input bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/30"
+          />
+          <input
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="Contraseña"
+            className="w-full rounded-full border border-input bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/30"
+          />
+        </div>
+
+        {error && <p className="text-sm text-expense">{error}</p>}
+
+        <Button type="submit" disabled={pending} className="w-full">
           {pending ? "Entrando…" : "Entrar"}
-        </button>
+        </Button>
       </form>
     </main>
   );

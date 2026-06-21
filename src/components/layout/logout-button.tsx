@@ -1,6 +1,8 @@
 "use client";
 
+import { LogOut } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
 
 export function LogoutButton() {
   async function handleLogout() {
@@ -10,11 +12,9 @@ export function LogoutButton() {
   }
 
   return (
-    <button
-      onClick={handleLogout}
-      className="text-sm text-muted-foreground hover:text-foreground"
-    >
-      Salir
-    </button>
+    <Button variant="outline" size="sm" onClick={handleLogout}>
+      <LogOut className="size-4" />
+      <span className="hidden sm:inline">Salir</span>
+    </Button>
   );
 }
