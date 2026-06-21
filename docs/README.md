@@ -7,9 +7,10 @@ arquitectura y el método de documentación de `larissa-esteves-web`, añadiendo
 > **Nivel de detalle:** implementación. Cada módulo define entidades, RF/RNF, diagramas (Mermaid) y
 > criterios de aceptación.
 
-> **Estado (2026-06-20): EN PRODUCCIÓN.** App + worker + Supabase desplegados en el VPS (Dokploy).
-> Implementado: **T1** (capa Notion), **M1** (Finanzas, sync + UI), **M7** (auth single-user). Ver
-> `CLAUDE.md` → "Estado actual". El resto de módulos siguen en diseño/borrador.
+> **Estado (2026-06-21): EN PRODUCCIÓN.** App + worker + Supabase desplegados en el VPS (Dokploy).
+> Implementado: **T1** (capa Notion, lectura+escritura), **M1** (Finanzas: sync + UI + escritura a Notion),
+> **M4** (banco de contexto), **M7** (auth single-user), **T5** (sistema de diseño + Storybook). Ver
+> `CLAUDE.md` → "Estado actual". Siguiente por dependencias: **M6** (asistente IA).
 
 ## Organización (híbrido en 2 niveles)
 - **GLOBAL** (`00-overview/`) — visión, arquitectura C4, **ER global** canónico, mapa de casos de uso, convenciones.
@@ -38,9 +39,9 @@ docs/
 | T1 | Integración Notion (best-practices) | 🟩 implementado |
 | T2 | Integración correo (Gmail + IMAP) | 🟧 borrador |
 | T3 | Integración Calendar / eventos | 🟧 borrador |
-| T4 | Infra & DevOps (Hostinger/Dokploy/Docker) | 🟧 borrador |
-| T5 | Sistema de diseño | 🟧 borrador |
-| T6 | Calidad y pruebas | 🟧 borrador |
+| T4 | Infra & DevOps (Hostinger/Dokploy/Docker) | 🟩 implementado (prod) |
+| T5 | Sistema de diseño (+ Storybook) | 🟩 implementado |
+| T6 | Calidad y pruebas (Vitest/RTL + Storybook) | 🟨 en progreso |
 
 ## Ledger de decisiones de arquitectura
 | # | Decisión | Detalle |

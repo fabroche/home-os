@@ -62,27 +62,34 @@ La app encola tareas en `ai_jobs` (Supabase) y el `worker` las drena con el runn
 | M6 | Asistente IA (jobs headless) |
 | M7 | Auth & seguridad (single-user) |
 
-## Estado actual (2026-06-20) — EN PRODUCCIÓN
+## Estado actual (2026-06-21) — EN PRODUCCIÓN
 Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **worker** (sync 24/7) +
-**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`.
+**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 60 tests verdes.
 
 **Implementado:**
 - **T1 · Capa Notion** (`src/lib/notion/`): client (fetch nativo undici — el `node-fetch@2` del SDK fallaba
   con "Premature close" vs Cloudflare), schema registry, paginación, rate-limit+retry, mappers Zod, sync.
+  **Escritura** (`mutations.ts` + `properties-write.ts`): `updatePageProps`/`createPageInDb`/`retrievePage`.
 - **M1 · Finanzas**: sync Notion→Supabase (worker/cron) de `Presupuesto`→`movimiento` y `Deudas_Personales`→`deuda`;
-  la UI lee de Supabase; KPIs, gastos por categoría, resumen mensual y deudas. Tablas en `supabase/migrations/`.
-  **Escritura a Notion** (modelo híbrido): editar `status` (Pendiente/Pagado), alta de gastos/deudas con firma
-  de importe, y subida de **factura/comprobante** a Storage público + enlace en Notion. Botón de **sync manual**.
-  Deudas = saldo neto por persona (pendiente vs por cobrar). Migración `0003_finanzas_write.sql`.
+  la UI lee de Supabase; KPIs, gastos por categoría, resumen mensual y deudas. **Escritura a Notion** (modelo
+  híbrido): editar `status` (Pendiente/Pagado), alta de gastos/deudas con firma de importe, subida de
+  **factura/comprobante** a Storage público + enlace en Notion, y **sync manual** desde la UI. Deudas = saldo
+  neto por persona (pendiente vs por cobrar). Migraciones `0001`/`0003`.
 - **M7 · Auth**: email+contraseña single-user; login/logout **en cliente** (cookie fiable tras Traefik);
   `src/proxy.ts` (middleware Next 16) protege rutas (fail-closed). Usuario en Supabase, sin SMTP aún.
 - **M4 · Banco de contexto**: CRUD de entradas tipadas (tags + vigencia + estado) y recuperación selectiva
-  por tipo/tag/vigencia + FTS Postgres (sin embeddings, D7). Migración `0002_contexto.sql` (incluye la
-  función SQL `recuperar_contexto`) — **pendiente de aplicar en Supabase**. UI en `/contexto`, 27 tests.
+  por tipo/tag/vigencia + FTS Postgres (sin embeddings, D7). Migración `0002_contexto.sql` **aplicada**
+  (incluye la función SQL `recuperar_contexto`). UI en `/contexto`.
+- **T5 · Sistema de diseño**: identidad editorial (Inter Tight + Instrument Serif italic, marca violeta
+  `#4928fd`, light+dark con next-themes, motion discreto). Primitivas en `src/components/{ui,theme,motion}`.
+  Header persistente (grupo `(dashboard)`) + **loading skeletons a medida**. **Storybook 10** (stories + a11y +
+  toggle de tema). Ver `docs/transversal/sistema-de-diseno.md`.
 
-**Pendiente:** aplicar `0002_contexto.sql` y `0003_finanzas_write.sql` en Supabase; activar **escritura** en la
-integración de Notion + columna `comprobante` (files) en Presupuesto + `NOTION_API_KEY` en el contenedor app;
-SMTP/correo + DNS; M6 (asistente IA, consume M4), luego M3 (correo) y M2 (calendario); M5 (dashboard).
+**Pendiente (prerequisitos manuales para la escritura M1):** activar **Insert/Update content** en la
+integración de Notion + columna files `comprobante` en Presupuesto + `NOTION_API_KEY` en el contenedor `app` +
+aplicar `0003_finanzas_write.sql` en Supabase.
+**Roadmap:** SMTP/correo + DNS; **M6** (asistente IA, consume M4), luego **M3** (correo) y **M2** (calendario);
+**M5** (dashboard). Orden por dependencias: M4✓ → M6 → M3/M2 → M5.
 
 **Deploy:** ver `docs/transversal/infra-devops.md`. Gotchas resueltos documentados en la memoria del proyecto.
 

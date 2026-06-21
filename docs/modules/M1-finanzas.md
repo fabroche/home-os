@@ -3,9 +3,16 @@
 | Campo | Valor |
 |-------|-------|
 | **ID** | M1 |
-| **Estado** | 🟧 borrador |
+| **Estado** | 🟩 implementado (lectura + escritura; falta conciliación factura↔gasto de M3/M6) |
 | **Depende de** | T1 (Notion), M3 (correo/facturas), M7 (auth), Supabase |
 | **Lo usan** | M5 (dashboard), M6 (IA: conciliación/RAG) |
+
+> **Implementado (2026-06-21):** sync Notion→Supabase (lectura) + **escritura a Notion** desde la app:
+> editar `status` (Pendiente/Pagado), alta de gastos/deudas con **firma de importe** (gasto/deuda negativo,
+> ingreso positivo), subida de **factura/comprobante** a Storage público + enlace externo en Notion, y **sync
+> manual**. Deudas = **saldo neto por persona** (deuda negativa + pagos positivos → pendiente / por cobrar).
+> Capa de escritura Notion: `lib/notion/{mutations,properties-write}.ts`. Migración `0003_finanzas_write.sql`.
+> **Pendiente:** filtros por mes; conciliación factura↔gasto (requiere M3/M6).
 
 ## 1. Propósito y alcance
 Centralizar las finanzas personales: leer/escribir las **DBs de finanzas de Notion**, espejarlas en
