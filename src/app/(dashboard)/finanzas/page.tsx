@@ -1,5 +1,6 @@
 import { listMovimientos, listDeudas, resumen, ultimoSync } from "@/lib/services/finanzas";
 import { gastosPorCategoria, porMes, resumenDeudas } from "@/lib/finanzas/aggregations";
+import { PERSONAS_DEUDA } from "@/types/finanzas";
 import { BarList } from "@/components/finanzas/bar-list";
 import { SyncButton } from "@/components/finanzas/sync-button";
 import { MovimientosTable } from "@/components/finanzas/movimientos-table";
@@ -50,6 +51,13 @@ export default async function FinanzasPage() {
   const porCat = gastosPorCategoria(movimientos);
   const meses = porMes(movimientos);
   const rd = resumenDeudas(deudas);
+  // Personas existentes (de los datos reales) unidas con las conocidas, para el alta de deuda.
+  const personasDeuda = [
+    ...new Set([
+      ...deudas.map((d) => d.persona).filter((p): p is string => Boolean(p)),
+      ...PERSONAS_DEUDA,
+    ]),
+  ].sort();
   const recientes = [...movimientos]
     .sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""))
     .slice(0, 15);
@@ -126,7 +134,7 @@ export default async function FinanzasPage() {
         <section className="mt-10">
           <h2 className="mb-3 text-lg font-semibold">Deudas personales</h2>
           <div className="mb-4">
-            <NuevaDeuda />
+            <NuevaDeuda personas={personasDeuda} />
           </div>
 
           {/* Saldos: pendiente por pagar vs a favor por cobrar */}

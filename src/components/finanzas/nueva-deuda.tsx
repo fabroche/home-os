@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X } from "lucide-react";
-import { PERSONAS_DEUDA } from "@/types/finanzas";
 import { crearDeuda } from "@/lib/actions/finanzas";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,8 +13,13 @@ function hoy() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Alta de un movimiento de deuda (deuda negativa / pago positivo) en Notion. */
-export function NuevaDeuda() {
+const NUEVA = "__nueva__";
+
+/**
+ * Alta de un movimiento de deuda (deuda negativa / pago positivo) en Notion.
+ * `personas` = las que ya existen; se puede elegir una o crear una nueva.
+ */
+export function NuevaDeuda({ personas }: { personas: string[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -23,19 +27,23 @@ export function NuevaDeuda() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [concepto, setConcepto] = useState("");
-  const [persona, setPersona] = useState<string>(PERSONAS_DEUDA[0]);
+  const [persona, setPersona] = useState<string>(personas[0] ?? NUEVA);
+  const [nuevaPersona, setNuevaPersona] = useState("");
   const [valor, setValor] = useState("");
   const [movimiento, setMovimiento] = useState<"deuda" | "pago">("deuda");
   const [fecha, setFecha] = useState(hoy());
+
+  const creandoNueva = persona === NUEVA;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setErrors({});
     setFormError(null);
+    const personaFinal = creandoNueva ? nuevaPersona.trim() : persona;
     startTransition(async () => {
       const res = await crearDeuda({
         concepto,
-        persona,
+        persona: personaFinal,
         valor: Number(valor),
         movimiento,
         fecha,
@@ -43,6 +51,8 @@ export function NuevaDeuda() {
       if (res.ok) {
         setConcepto("");
         setValor("");
+        setNuevaPersona("");
+        setPersona(personas[0] ?? NUEVA);
         setOpen(false);
         router.refresh();
       } else {
@@ -100,18 +110,24 @@ export function NuevaDeuda() {
             </Select>
           </Field>
           <Field label="Persona" htmlFor="persona" error={errors.persona}>
-            <Input
-              id="persona"
-              list="personas-deuda"
-              value={persona}
-              onChange={(e) => setPersona(e.target.value)}
-              placeholder="Persona"
-            />
-            <datalist id="personas-deuda">
-              {PERSONAS_DEUDA.map((p) => (
-                <option key={p} value={p} />
+            <Select id="persona" value={persona} onChange={(e) => setPersona(e.target.value)}>
+              {personas.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
               ))}
-            </datalist>
+              <option value={NUEVA}>➕ Otra persona…</option>
+            </Select>
+            {creandoNueva && (
+              <Input
+                aria-label="Nueva persona"
+                value={nuevaPersona}
+                onChange={(e) => setNuevaPersona(e.target.value)}
+                placeholder="Nombre de la persona"
+                className="mt-2"
+                autoFocus
+              />
+            )}
           </Field>
           <Field label="Valor (€)" htmlFor="valor" error={errors.valor}>
             <Input
