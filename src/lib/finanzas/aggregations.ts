@@ -60,24 +60,48 @@ export function porMes(movs: Movimiento[]): MesResumen[] {
 }
 
 export type DeudasResumen = {
+  /** Saldo pendiente de pago (magnitud, suma de los netos negativos por persona). */
   total: number;
+  /** A tu favor por cobrar (magnitud, suma de los netos positivos por persona). */
+  totalPorCobrar: number;
+  /** Pendiente por pagar, por persona (solo netos negativos), de mayor a menor. */
   porPersona: { persona: string; total: number }[];
+  /** A favor por cobrar, por persona (solo netos positivos), de mayor a menor. */
+  porCobrar: { persona: string; total: number }[];
 };
 
-/** Total de deudas (magnitud) y desglose por persona. */
+/**
+ * Saldo de deudas por persona. Convención de Notion (Deudas_Personales): la deuda se
+ * registra en NEGATIVO y cada pago en POSITIVO con la misma persona; el neto con signo
+ * es el saldo. Neto < 0 → aún debes (por pagar); neto > 0 → a tu favor (por cobrar).
+ */
 export function resumenDeudas(deudas: Deuda[]): DeudasResumen {
-  const acc = new Map<string, number>();
-  let total = 0;
+  const neto = new Map<string, number>();
   for (const d of deudas) {
-    const v = Math.abs(d.valor ?? 0);
-    total += v;
     const persona = d.persona ?? "—";
-    acc.set(persona, (acc.get(persona) ?? 0) + v);
+    neto.set(persona, (neto.get(persona) ?? 0) + (d.valor ?? 0));
   }
-  return {
-    total,
-    porPersona: [...acc.entries()]
-      .map(([persona, t]) => ({ persona, total: t }))
-      .sort((a, b) => b.total - a.total),
-  };
+
+  const porPersona: { persona: string; total: number }[] = [];
+  const porCobrar: { persona: string; total: number }[] = [];
+  let total = 0;
+  let totalPorCobrar = 0;
+
+  for (const [persona, raw] of neto) {
+    const n = Math.round(raw * 100) / 100; // evita ruido de coma flotante en euros
+    if (n < 0) {
+      const pendiente = -n;
+      total += pendiente;
+      porPersona.push({ persona, total: pendiente });
+    } else if (n > 0) {
+      totalPorCobrar += n;
+      porCobrar.push({ persona, total: n });
+    }
+    // n === 0 → deuda saldada, no aporta a ningún lado
+  }
+
+  porPersona.sort((a, b) => b.total - a.total);
+  porCobrar.sort((a, b) => b.total - a.total);
+
+  return { total, totalPorCobrar, porPersona, porCobrar };
 }

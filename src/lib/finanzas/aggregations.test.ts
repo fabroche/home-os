@@ -84,10 +84,36 @@ function deuda(valor: number | null, persona: string | null): Deuda {
 }
 
 describe("resumenDeudas", () => {
-  it("suma magnitudes y agrupa por persona", () => {
-    const r = resumenDeudas([deuda(-100, "Leo"), deuda(50, "Leo"), deuda(200, "Guille")]);
-    expect(r.total).toBe(350);
-    expect(r.porPersona[0]).toEqual({ persona: "Guille", total: 200 });
-    expect(r.porPersona.find((p) => p.persona === "Leo")?.total).toBe(150);
+  it("calcula el saldo pendiente como neto por persona (deuda negativa + pagos positivos)", () => {
+    const r = resumenDeudas([
+      deuda(-450, "Tia Anay"), // deuda inicial
+      deuda(100, "Tia Anay"), // pago
+      deuda(100, "Tia Anay"), // pago → neto -250
+      deuda(-100, "Leo"),
+      deuda(50, "Leo"), // neto -50
+    ]);
+    expect(r.total).toBe(300); // 250 + 50
+    expect(r.totalPorCobrar).toBe(0);
+    expect(r.porPersona[0]).toEqual({ persona: "Tia Anay", total: 250 });
+    expect(r.porPersona.find((p) => p.persona === "Leo")?.total).toBe(50);
+  });
+
+  it("no cuenta como deuda lo que queda a tu favor (neto positivo = por cobrar)", () => {
+    const r = resumenDeudas([
+      deuda(-100, "Guille"),
+      deuda(150, "Guille"), // neto +50 → te debe a ti
+    ]);
+    expect(r.total).toBe(0);
+    expect(r.totalPorCobrar).toBe(50);
+    expect(r.porCobrar[0]).toEqual({ persona: "Guille", total: 50 });
+    expect(r.porPersona).toHaveLength(0);
+  });
+
+  it("una deuda saldada (neto 0) no aparece en ningún lado", () => {
+    const r = resumenDeudas([deuda(-200, "Leo"), deuda(200, "Leo")]);
+    expect(r.total).toBe(0);
+    expect(r.totalPorCobrar).toBe(0);
+    expect(r.porPersona).toHaveLength(0);
+    expect(r.porCobrar).toHaveLength(0);
   });
 });
