@@ -3,7 +3,7 @@
 | Campo | Valor |
 |-------|-------|
 | **ID** | M4 |
-| **Estado** | 🟧 borrador |
+| **Estado** | 🟩 implementado |
 | **Depende de** | M7 (auth), Supabase |
 | **Lo usan** | M1, M2, M3, M6 (toda la IA) |
 
@@ -69,8 +69,21 @@ flowchart LR
 ## 9. Componentes UI (DoD)
 | Componente | Test RTL | Estado |
 |------------|:--------:|--------|
-| `ListaContexto` (filtros) | ⬜ | ⬜ |
-| `EditorEntradaContexto` | ⬜ | ⬜ |
+| `ListaContexto` (filtros) | 🟩 | 🟩 |
+| `EditorEntradaContexto` (`EditorEntrada`) | 🟩 | 🟩 |
+
+### Implementación (2026-06-21)
+- **Migración:** `supabase/migrations/0002_contexto.sql` — `entrada_contexto` (+ `fts` tsvector
+  español generado, GIN), `entrada_contexto_tag`, RLS owner, trigger `updated_at` y la función
+  SQL `recuperar_contexto(p_user,p_tipos,p_tags,p_consulta,p_k)` (filtra publicado+vigente, rankea
+  con `ts_rank_cd`). **Falta aplicarla en Supabase** (Studio o `psql $SUPABASE_DB_URL`).
+- **Tipos:** `src/types/contexto.ts` (Zod: DTO + input de formulario + params de recuperación).
+- **Recuperación:** `src/lib/ai/context/retrieve.ts` (`recuperarContexto`, `buildRpcArgs` puro).
+- **Datos/acciones:** `src/lib/services/contexto.ts` (lectura RLS) + `src/lib/actions/contexto.ts`
+  (`guardarEntrada`, `cambiarEstado`, `eliminarEntrada`; resultado discriminado).
+- **UI:** `src/app/(dashboard)/contexto/page.tsx` + `components/contexto/{lista-contexto,editor-entrada}.tsx`
+  + primitivas `components/ui/input.tsx` (Input/Textarea/Select/Field).
+- **Tests:** 27 verdes (Zod, `buildRpcArgs`, RTL de lista y editor).
 
 ## 10. Criterios de aceptación
 - [ ] La recuperación nunca devuelve entradas archivadas/no vigentes.

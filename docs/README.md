@@ -31,7 +31,7 @@ docs/
 | M1 | Finanzas (Notion + facturas del correo) | 🟩 implementado (prod) |
 | M2 | Calendario inteligente | 🟧 borrador |
 | M3 | Backoffice / triaje de correo | 🟧 borrador |
-| M4 | Banco de contexto (IA) | 🟧 borrador |
+| M4 | Banco de contexto (IA) | 🟩 implementado |
 | M5 | Dashboard | 🟧 borrador |
 | M6 | Asistente IA / orquestación (jobs headless) | 🟧 borrador |
 | M7 | Auth & seguridad (single-user) | 🟩 implementado |

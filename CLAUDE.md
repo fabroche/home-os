@@ -26,7 +26,9 @@ npm run sync:finanzas    # sync manual Notion→Supabase (el worker lo hace por 
 - **`src/config/env.ts`** — validación de env con Zod (fail-fast). Leer env SIEMPRE de aquí.
 - **`src/lib/notion/`** — capa Notion aislada (client, schema registry, paginate, rate-limit, mappers, sync). Modelo **híbrido**: se edita en Notion, la UI lee de **Supabase**.
 - **`worker/`** — proceso aparte: cron (sync, polling correo, eventos, recordatorios) + **runner IA**.
-- **`src/app/globals.css`** — Tailwind v4 `@theme` (sin `tailwind.config.js`). Light-only.
+- **`src/app/globals.css`** — Tailwind v4 `@theme` (sin `tailwind.config.js`). **Sistema de diseño** editorial:
+  Inter Tight + Instrument Serif italic, marca violeta `#4928fd`, light+dark (`next-themes`), motion discreto.
+  Ver `docs/transversal/sistema-de-diseno.md`. Componentes en `src/components/{ui,theme,motion,layout}`.
 
 ## IA de runtime (importante)
 La IA dentro de la app usa **Claude Code headless con la suscripción** (`claude -p`), **sin API key**.
@@ -45,7 +47,7 @@ La app encola tareas en `ai_jobs` (Supabase) y el `worker` las drena con el runn
 ## Documentación y subagentes
 - Especificaciones técnicas completas en **`docs/`** (overview + módulos M1–M7 + transversales). Empezar por `docs/README.md`.
 - Banco de contexto del dev en **`agente/`**.
-- Subagentes en **`.claude/agents/`**: `frontend`, `backend`, `devops`, `backoffice`, `notion-integration`, `finanzas-data`, `qa-testing`, `ai-agente`.
+- Subagentes en **`.claude/agents/`**: `frontend`, `backend`, `devops`, `backoffice`, `calendario`, `notion-integration`, `finanzas-data`, `qa-testing`, `ai-agente`.
 
 ## Módulos
 | ID | Módulo |
@@ -69,9 +71,12 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
   la UI lee de Supabase; KPIs, gastos por categoría, resumen mensual y deudas. Tablas en `supabase/migrations/`.
 - **M7 · Auth**: email+contraseña single-user; login/logout **en cliente** (cookie fiable tras Traefik);
   `src/proxy.ts` (middleware Next 16) protege rutas (fail-closed). Usuario en Supabase, sin SMTP aún.
+- **M4 · Banco de contexto**: CRUD de entradas tipadas (tags + vigencia + estado) y recuperación selectiva
+  por tipo/tag/vigencia + FTS Postgres (sin embeddings, D7). Migración `0002_contexto.sql` (incluye la
+  función SQL `recuperar_contexto`) — **pendiente de aplicar en Supabase**. UI en `/contexto`, 27 tests.
 
-**Pendiente:** SMTP/correo + DNS (recuperación contraseña, magic link); M3 (correo), M2 (calendario),
-M4 (banco contexto), M6 (asistente IA). Mejoras M1: filtros por mes, escritura a Notion.
+**Pendiente:** aplicar `0002_contexto.sql` en Supabase; SMTP/correo + DNS (recuperación contraseña, magic
+link); M6 (asistente IA, consume M4), luego M3 (correo) y M2 (calendario); M5 (dashboard). Mejoras M1.
 
 **Deploy:** ver `docs/transversal/infra-devops.md`. Gotchas resueltos documentados en la memoria del proyecto.
 
