@@ -62,10 +62,17 @@ export default function FinanzasLoading() {
         ))}
       </div>
 
-      {/* Movimientos recientes */}
-      <Skeleton className="mt-10 h-6 w-56" />
+      {/* Movimientos */}
+      <Skeleton className="mt-10 h-6 w-40" />
       <Skeleton className="mt-3 h-9 w-44 rounded-full" />
-      <div className="mt-4 rounded-xl border border-border p-4">
+      {/* Barra de filtros */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Skeleton className="h-9 w-56 rounded-full" />
+        <Skeleton className="h-9 w-36 rounded-full" />
+        <Skeleton className="h-9 w-44 rounded-full" />
+        <Skeleton className="h-9 w-36 rounded-full" />
+      </div>
+      <div className="mt-3 rounded-xl border border-border p-4">
         <div className="space-y-3">
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-6 w-full" />

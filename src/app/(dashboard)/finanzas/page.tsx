@@ -58,9 +58,6 @@ export default async function FinanzasPage() {
       ...PERSONAS_DEUDA,
     ]),
   ].sort();
-  const recientes = [...movimientos]
-    .sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? ""))
-    .slice(0, 15);
 
   return (
     <main className="container-app max-w-5xl py-12">
@@ -213,13 +210,13 @@ export default async function FinanzasPage() {
         </section>
       </Reveal>
 
-      {/* Movimientos recientes */}
+      {/* Movimientos */}
       <Reveal>
-        <h2 className="mt-10 mb-3 text-lg font-semibold">Movimientos recientes</h2>
+        <h2 className="mt-10 mb-3 text-lg font-semibold">Movimientos</h2>
         <div className="mb-4">
           <NuevoMovimiento />
         </div>
-        <MovimientosTable movimientos={recientes} />
+        <MovimientosTable movimientos={movimientos} />
       </Reveal>
     </main>
   );
