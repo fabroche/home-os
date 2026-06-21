@@ -46,6 +46,25 @@ adaptada a un dashboard de datos legible). Definida íntegramente en `src/app/gl
 ## Dependencias añadidas
 `motion`, `next-themes`, `react-countup`.
 
+## Storybook (DoD)
+- **Storybook v10** con `@storybook/nextjs-vite` (compatible con Next 16 + React 19).
+- **Tailwind v4** vía `@tailwindcss/vite` en `viteFinal` (`.storybook/main.ts`) + `import '../src/app/globals.css'`
+  en `.storybook/preview.tsx`. Addons: `addon-a11y`, `addon-docs`.
+- **NO** usamos `@storybook/addon-vitest` (stories-como-tests en navegador): exige Vitest 3/4 y el proyecto
+  va en **Vitest 2**. Los tests de comportamiento se cubren con **RTL** co-locados (`*.test.tsx`).
+- Stories **co-locadas** junto al componente (`*.stories.tsx`), formato **CSF3** (`satisfies Meta<typeof X>`).
+  Hay stories de las primitivas: `Button`, `Card`, `Badge`, `Input/Textarea/Select/Field`, `ThemeToggle`, `BarList`.
+- Comandos: `npm run storybook` (dev, :6006) · `npm run build-storybook`.
+- **Toggle de tema** (Light/Dark) en la toolbar (`.storybook/preview.tsx`, decorator manual sin addon):
+  aplica `.dark` al canvas para revisar cada componente en ambos temas.
+- **Chromatic** (regresión visual): diferido hasta congelar el diseño.
+
+### Definition of Done de un componente
+1. Implementación con tokens/primitivas + `cn()`.
+2. **Story** cubriendo variantes y estados.
+3. **Test RTL** de comportamiento (no solo render).
+4. (Diferido) baseline Chromatic.
+
 ## Accesibilidad
 - Navegación por teclado, foco visible (`focus-visible:ring-ring`), contraste AA en ambos temas.
 - Motion respeta `prefers-reduced-motion`; el toggle de tema evita mismatch de hidratación.

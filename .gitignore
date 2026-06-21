@@ -43,3 +43,6 @@ Thumbs.db
 
 # misc
 .turbo
+
+*storybook.log
+storybook-static

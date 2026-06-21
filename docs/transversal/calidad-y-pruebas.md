@@ -1,10 +1,20 @@
 # T6 · Calidad y pruebas
 
 ## Herramientas
-- **Vitest** + Testing Library (unit/componentes) · **Playwright** (E2E) · **ESLint** + **Prettier** · `tsc --noEmit`.
+- **Vitest** + Testing Library (unit/componentes) · **Storybook** (UI aislada, variantes/estados, a11y) ·
+  **Playwright** (E2E) · **ESLint** + **Prettier** · `tsc --noEmit`.
+- Storybook: **v10** con `@storybook/nextjs-vite` (Next 16 + React 19). Tailwind v4 vía `@tailwindcss/vite`
+  en `viteFinal` y `import '../src/app/globals.css'` en `.storybook/preview.tsx`. Scripts: `npm run storybook`,
+  `npm run build-storybook`. (No usamos el addon-vitest porque exige Vitest 3/4 y el proyecto va en Vitest 2.)
 
-## Definition of Done
-- Componente no trivial = implementación + **test RTL**.
+## Definition of Done (mandatorio)
+Un componente/funcionalidad **no está terminado** sin:
+1. **Implementación** con el sistema de diseño (tokens, `cn()`, primitivas).
+2. **Story** en Storybook cubriendo variantes y estados (co-locada `*.stories.tsx` junto al componente).
+3. **Test RTL** de comportamiento (interacción, validación, estados; no solo render).
+4. **Baseline Chromatic** para regresión visual — *diferido* hasta congelar el diseño.
+
+Además:
 - Lógica de `lib/services` y mappers de `lib/notion` = **tests unitarios** (entrada→salida).
 - Flujos críticos (login, conciliación factura→gasto, triaje) = **E2E** Playwright.
 - Lo vigila el subagente `qa-testing`.

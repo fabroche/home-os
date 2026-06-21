@@ -14,8 +14,10 @@ npm run dev        # dev server (Turbopack)
 npm run build      # build de producción (standalone)
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
-npm run test       # Vitest
+npm run test       # Vitest (unit + RTL de componentes)
 npm run test:e2e   # Playwright
+npm run storybook       # Storybook dev (:6006) — UI aislada, variantes/estados, a11y
+npm run build-storybook # build estático de Storybook
 npm run worker     # worker local (cron de sync)
 npm run inspect:notion   # introspección read-only de una DB de Notion
 npm run sync:finanzas    # sync manual Notion→Supabase (el worker lo hace por cron)
@@ -69,14 +71,18 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
   con "Premature close" vs Cloudflare), schema registry, paginación, rate-limit+retry, mappers Zod, sync.
 - **M1 · Finanzas**: sync Notion→Supabase (worker/cron) de `Presupuesto`→`movimiento` y `Deudas_Personales`→`deuda`;
   la UI lee de Supabase; KPIs, gastos por categoría, resumen mensual y deudas. Tablas en `supabase/migrations/`.
+  **Escritura a Notion** (modelo híbrido): editar `status` (Pendiente/Pagado), alta de gastos/deudas con firma
+  de importe, y subida de **factura/comprobante** a Storage público + enlace en Notion. Botón de **sync manual**.
+  Deudas = saldo neto por persona (pendiente vs por cobrar). Migración `0003_finanzas_write.sql`.
 - **M7 · Auth**: email+contraseña single-user; login/logout **en cliente** (cookie fiable tras Traefik);
   `src/proxy.ts` (middleware Next 16) protege rutas (fail-closed). Usuario en Supabase, sin SMTP aún.
 - **M4 · Banco de contexto**: CRUD de entradas tipadas (tags + vigencia + estado) y recuperación selectiva
   por tipo/tag/vigencia + FTS Postgres (sin embeddings, D7). Migración `0002_contexto.sql` (incluye la
   función SQL `recuperar_contexto`) — **pendiente de aplicar en Supabase**. UI en `/contexto`, 27 tests.
 
-**Pendiente:** aplicar `0002_contexto.sql` en Supabase; SMTP/correo + DNS (recuperación contraseña, magic
-link); M6 (asistente IA, consume M4), luego M3 (correo) y M2 (calendario); M5 (dashboard). Mejoras M1.
+**Pendiente:** aplicar `0002_contexto.sql` y `0003_finanzas_write.sql` en Supabase; activar **escritura** en la
+integración de Notion + columna `comprobante` (files) en Presupuesto + `NOTION_API_KEY` en el contenedor app;
+SMTP/correo + DNS; M6 (asistente IA, consume M4), luego M3 (correo) y M2 (calendario); M5 (dashboard).
 
 **Deploy:** ver `docs/transversal/infra-devops.md`. Gotchas resueltos documentados en la memoria del proyecto.
 
