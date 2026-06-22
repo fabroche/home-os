@@ -43,11 +43,21 @@ _Cada una con la plantilla `funcionalidad.md`._
 |------|--------|---------|--------|------|-------|
 
 ## 9. Componentes UI (Definition of Done)
-| Componente | Test RTL | Estado |
-|------------|:--------:|--------|
+| Componente | Story | Test RTL | Estado |
+|------------|:-----:|:--------:|--------|
 
 ## 10. Criterios de aceptación del módulo
 - [ ] …
 
-## 11. Riesgos y decisiones abiertas
+## 11. DoD de cierre del módulo (obligatorio antes de marcar "hecho")
+_Ver `docs/transversal/calidad-y-pruebas.md` y `docs/transversal/mobile-first.md`._
+- [ ] Cada componente UI tiene **Story** (Storybook) **y Test RTL** co-locados.
+- [ ] Lógica de `lib/services` y mappers de `lib/notion` con **tests unitarios**.
+- [ ] **DoD móvil** cumplido (mobile-first: tablas, touch targets, sin scroll horizontal, light+dark).
+- [ ] Flujos críticos con **E2E** (si aplica).
+- [ ] Migraciones Supabase **aplicadas** en prod (si las hay).
+- [ ] `typecheck` + `lint` + `test` + `build` en verde; `dod-stories.test.ts` sin deuda nueva.
+- [ ] Documentación del módulo y **estado en `CLAUDE.md`** actualizados.
+
+## 12. Riesgos y decisiones abiertas
 - …

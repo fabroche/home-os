@@ -17,7 +17,21 @@ Un componente/funcionalidad **no está terminado** sin:
 Además:
 - Lógica de `lib/services` y mappers de `lib/notion` = **tests unitarios** (entrada→salida).
 - Flujos críticos (login, conciliación factura→gasto, triaje) = **E2E** Playwright.
+- **UX móvil** = cumplir el **DoD móvil** de `mobile-first.md` (mobile-first es obligatorio).
 - Lo vigila el subagente `qa-testing`.
+
+### Enforcement automatizado de stories
+`src/components/dod-stories.test.ts` recorre `src/components/**` y **falla** si un componente
+visual no tiene su `*.stories.tsx` co-locada. La deuda conocida vive en la lista `DEUDA_STORY`
+del propio test (visible y trackeada); al añadir una story hay que **quitar** el componente de
+esa lista o el test falla. Así un componente nuevo no puede entrar sin story, y la deuda solo
+puede decrecer. (Los módulos sin componente visual van en `SIN_STORY_NA`.)
+
+### DoD de cierre de módulo
+Un módulo **no se marca como hecho** sin el checklist de cierre (sección 11 de la plantilla
+`_templates/modulo.md`): stories+tests de cada componente, tests de lógica, DoD móvil,
+migraciones aplicadas, `typecheck`+`lint`+`test`+`build` verdes (incl. `dod-stories.test.ts`),
+y estado en `CLAUDE.md` actualizado.
 
 ## Qué testear con prioridad
 | Área | Test clave |
