@@ -28,6 +28,18 @@ artefacto hay que **quitar** el componente de la lista o el test falla. Así un 
 puede entrar sin story+test, y la deuda solo puede decrecer. (Lo no visual va en `SIN_STORY_NA` /
 `SIN_TEST_NA`.) **Hoy ambas deudas están vacías.**
 
+### Gotchas de Storybook + Next (verificar el render REAL)
+`build-storybook` compila pero **no ejecuta el render**: los errores de runtime solo salen en
+`npm run storybook` o cargando la story en un navegador. Verificar siempre el render real (p. ej.
+Playwright headless contra `iframe.html?id=<id>`). Casos resueltos:
+- **Server Actions** (`@/lib/actions/*`) rompen en navegador (`server-guard`) → mocks en
+  `.storybook/mocks/` + alias en `main.ts`.
+- **`useRouter`/`usePathname`** → `nextjs.appDirectory: true` (global en `preview.tsx`).
+- **Componentes mobile-only (`md:hidden`, p. ej. `MobileNav`) no se ven**: la página **Docs**
+  (autodocs) renderiza a ancho de escritorio y los oculta; el viewport solo afecta al Canvas.
+  Solución: **decorator "marco de móvil"** en la story que revierte `md:hidden`/`fixed` dentro de
+  un frame acotado, así se ven en Docs y Canvas.
+
 ### DoD de cierre de módulo
 Un módulo **no se marca como hecho** sin el checklist de cierre (sección 11 de la plantilla
 `_templates/modulo.md`): stories+tests de cada componente, tests de lógica, DoD móvil,
