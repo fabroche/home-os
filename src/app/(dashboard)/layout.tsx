@@ -1,5 +1,6 @@
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { ChatBubble } from "@/components/asistente/chat-bubble";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -8,6 +9,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <DashboardHeader />
       {children}
       <MobileNav />
+      <ChatBubble />
     </div>
   );
 }

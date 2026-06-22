@@ -75,6 +75,19 @@ export async function tomarSiguiente(): Promise<AiJob | null> {
   return first ? rowToJob(first) : null;
 }
 
+/** Lee un job acotado a su dueño (para el polling de la UI). null si no existe. */
+export async function obtenerJob(userId: string, id: string): Promise<AiJob | null> {
+  const sb = createSupabaseServiceClient();
+  const { data, error } = await sb
+    .from("ai_jobs")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(`obtenerJob: ${error.message}`);
+  return data ? rowToJob(data as JobRow) : null;
+}
+
 /** Cierra un job con su resultado (ok) o su error (reintentable). */
 export async function marcar(
   id: string,

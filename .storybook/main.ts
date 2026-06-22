@@ -24,6 +24,7 @@ const config: StorybookConfig = {
     const actionAliases = [
       { find: "@/lib/actions/finanzas", replacement: mock("./mocks/actions-finanzas.ts") },
       { find: "@/lib/actions/contexto", replacement: mock("./mocks/actions-contexto.ts") },
+      { find: "@/lib/actions/ai", replacement: mock("./mocks/actions-ai.ts") },
     ];
     const current = viteConfig.resolve.alias;
     if (Array.isArray(current)) {
@@ -32,6 +33,7 @@ const config: StorybookConfig = {
       viteConfig.resolve.alias = {
         "@/lib/actions/finanzas": actionAliases[0].replacement,
         "@/lib/actions/contexto": actionAliases[1].replacement,
+        "@/lib/actions/ai": actionAliases[2].replacement,
         ...(current ?? {}),
       };
     }
