@@ -1,4 +1,5 @@
 import type { Preview, Decorator } from "@storybook/nextjs-vite";
+import { INITIAL_VIEWPORTS } from "storybook/viewport";
 import "../src/app/globals.css";
 
 // Aplica el tema seleccionado en la toolbar añadiendo la clase `.dark` al canvas
@@ -25,6 +26,9 @@ const preview: Preview = {
     // invariant "expected app router to be mounted". Las stories pueden afinar
     // `nextjs.navigation.pathname` por encima de esto.
     nextjs: { appDirectory: true },
+    // Registra los viewports de dispositivo; una story selecciona el suyo con
+    // `globals.viewport.value` (p. ej. MobileNav usa un viewport móvil).
+    viewport: { options: INITIAL_VIEWPORTS },
   },
   initialGlobals: { theme: "light" },
   globalTypes: {

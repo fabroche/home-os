@@ -10,9 +10,11 @@ const meta = {
   component: MobileNav,
   parameters: {
     layout: "fullscreen",
-    viewport: { defaultViewport: "mobile1" },
     nextjs: { appDirectory: true, navigation: { pathname: "/finanzas" } },
   },
+  // Es `md:hidden`: solo se ve en móvil. Arranca con un viewport móvil para que
+  // sea visible al abrir la story sin tener que cambiarlo a mano.
+  globals: { viewport: { value: "iphone6", isRotated: false } },
   tags: ["autodocs"],
 } satisfies Meta<typeof MobileNav>;
 
