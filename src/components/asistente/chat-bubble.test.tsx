@@ -4,16 +4,21 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 const preguntar = vi.fn();
+const proponer = vi.fn();
 const consultar = vi.fn();
 vi.mock("@/lib/actions/ai", () => ({
   preguntarAsistente: (...a: unknown[]) => preguntar(...a),
+  proponerContexto: (...a: unknown[]) => proponer(...a),
   consultarJob: (...a: unknown[]) => consultar(...a),
 }));
+// SuggestionCard (vía ChatPanel) importa esta Server Action.
+vi.mock("@/lib/actions/contexto", () => ({ guardarEntrada: vi.fn() }));
 
 import { ChatBubble } from "@/components/asistente/chat-bubble";
 
 beforeEach(() => {
   preguntar.mockReset();
+  proponer.mockReset();
   consultar.mockReset();
 });
 
@@ -42,6 +47,28 @@ describe("ChatBubble", () => {
     await waitFor(() => expect(screen.getByText("En mayo gastaste 420 €.")).toBeInTheDocument());
     expect(screen.getByText(/12 movimientos/)).toBeInTheDocument();
     expect(preguntar).toHaveBeenCalledWith({ pregunta: "¿gasto de mayo?" });
+  });
+
+  it("intención de enseñar: propone y muestra la tarjeta de sugerencia", async () => {
+    proponer.mockResolvedValue({ ok: true, jobId: "j3" });
+    consultar.mockResolvedValue({
+      estado: "ok",
+      tipo: "proponer_contexto",
+      borradores: [
+        { tipo: "proveedor", titulo: "Naturgy", contenido: "Compañía de gas", tags: ["gas"] },
+      ],
+    });
+
+    render(<ChatBubble defaultOpen pollMs={5} />);
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
+      target: { value: "recuérdame que Naturgy es mi proveedor de gas" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => expect(screen.getByText(/sugerencia de contexto/i)).toBeInTheDocument());
+    expect(screen.getByText("Naturgy")).toBeInTheDocument();
+    expect(proponer).toHaveBeenCalled();
+    expect(preguntar).not.toHaveBeenCalled();
   });
 
   it("muestra el error si el job falla", async () => {

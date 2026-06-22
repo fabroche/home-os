@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Send, Sparkles } from "lucide-react";
 import { ChatMessage, type ChatMsg } from "@/components/asistente/chat-message";
+import { SuggestionCard } from "@/components/asistente/suggestion-card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +65,13 @@ export function ChatPanel({
             Preguntá sobre tus finanzas o pedime guardar una regla en tu banco de contexto.
           </p>
         ) : (
-          messages.map((m) => <ChatMessage key={m.id} msg={m} />)
+          messages.map((m) =>
+            m.borrador ? (
+              <SuggestionCard key={m.id} borrador={m.borrador} />
+            ) : (
+              <ChatMessage key={m.id} msg={m} />
+            ),
+          )
         )}
       </div>
 

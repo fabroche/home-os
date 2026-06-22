@@ -1,7 +1,7 @@
 import "@/lib/server-guard";
 import { spawn } from "node:child_process";
 import { env } from "@/config/env";
-import { recuperarContexto } from "@/lib/ai/context/retrieve";
+import { recuperarContexto, listarContexto } from "@/lib/ai/context/retrieve";
 import { tomarSiguiente, marcar } from "@/lib/ai/jobs";
 import { JOB_OUTPUT_SCHEMAS, type AiJob } from "@/types/ai";
 import type { FragmentoContexto } from "@/types/contexto";
@@ -98,18 +98,28 @@ function invocarClaude(prompt: string): Promise<string> {
 export type RunnerDeps = {
   invocar: (prompt: string) => Promise<string>;
   recuperar: typeof recuperarContexto;
+  listar: typeof listarContexto;
 };
-const defaultDeps: RunnerDeps = { invocar: invocarClaude, recuperar: recuperarContexto };
+const defaultDeps: RunnerDeps = {
+  invocar: invocarClaude,
+  recuperar: recuperarContexto,
+  listar: listarContexto,
+};
 
 /**
- * Ejecuta un job: recupera contexto (publicado), arma el prompt, invoca el motor
- * y **valida la salida con Zod**. Lanza si la salida no conforma (→ error reintentable).
+ * Ejecuta un job: obtiene el contexto adecuado, arma el prompt, invoca el motor y
+ * **valida la salida con Zod**. Lanza si no conforma (→ error reintentable).
+ * `consulta_rag` decide con contexto **publicado**; `proponer_contexto` usa la
+ * lectura de **awareness** (incluye borradores) solo para no duplicar.
  */
 export async function ejecutarJob(job: AiJob, deps: RunnerDeps = defaultDeps): Promise<unknown> {
   const schema = JOB_OUTPUT_SCHEMAS[job.tipo as keyof typeof JOB_OUTPUT_SCHEMAS];
   if (!schema) throw new Error(`ejecutarJob: tipo sin contrato de salida: ${job.tipo}`);
 
-  const fragmentos = await deps.recuperar(job.userId, { consulta: textoEntrada(job), k: 8 });
+  const fragmentos =
+    job.tipo === "proponer_contexto"
+      ? await deps.listar(job.userId)
+      : await deps.recuperar(job.userId, { consulta: textoEntrada(job), k: 8 });
   const prompt = construirPrompt(job, fragmentos);
   const raw = await deps.invocar(prompt);
   return schema.parse(extraerJson(raw)); // ZodError ⇒ el job se marca error (reintentable)

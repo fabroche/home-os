@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import type { BorradorContexto } from "@/types/ai";
 
 export type Fuente = { id: string; titulo: string };
 export type ChatMsg = {
@@ -7,6 +8,8 @@ export type ChatMsg = {
   contenido: string;
   fuentes?: Fuente[];
   pendiente?: boolean;
+  /** Si está presente, el mensaje es una propuesta de contexto (se renderiza como tarjeta). */
+  borrador?: BorradorContexto;
 };
 
 /** Una burbuja de mensaje del asistente (usuario a la derecha, IA a la izquierda). */
