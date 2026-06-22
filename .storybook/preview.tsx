@@ -20,6 +20,11 @@ const preview: Preview = {
       matchers: { color: /(background|color)$/i, date: /Date$/i },
     },
     a11y: { test: "todo" },
+    // App Router: monta el mock de router de Storybook para que los componentes
+    // que usan `useRouter`/`usePathname` (next/navigation) rendericen sin el
+    // invariant "expected app router to be mounted". Las stories pueden afinar
+    // `nextjs.navigation.pathname` por encima de esto.
+    nextjs: { appDirectory: true },
   },
   initialGlobals: { theme: "light" },
   globalTypes: {
