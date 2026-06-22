@@ -12,8 +12,14 @@ Capa de IA **agnóstica al motor**: la app encola tareas en `AI_JOB`; el **worke
 **Claude Code headless** usando tu **suscripción** (sin API key). Define los **contratos de tarea**
 (entrada/salida con Zod), el runner y el manejo de errores/reintentos.
 
-**Dentro:** cola de jobs, runner headless, contratos por tipo de tarea, validación de salida, reintentos.
-**Fuera:** la lógica de cada dominio (vive en M1/M2/M3); la edición del conocimiento (M4).
+**Dentro:** cola de jobs, runner headless, contratos por tipo de tarea, validación de salida, reintentos,
+la **burbuja de chat** (UI del asistente) y la **propuesta de borradores** para el banco de contexto (M4).
+**Fuera:** la lógica de cada dominio (vive en M1/M2/M3). La **publicación/curaduría** del conocimiento es
+del usuario (M4): la IA solo crea borradores.
+
+> **Gobernanza M4↔M6 (principio).** La IA **lee** borradores y publicados, pero **decide solo con lo
+> publicado** (`recuperar_contexto` ya filtra `estado='publicado'` + vigente). **Escribe** únicamente
+> borradores; **publicar es siempre acción del usuario.**
 
 ## 2. Actores
 App web (encola); Worker/Runner (ejecuta); Claude Code headless (motor).
@@ -28,6 +34,10 @@ App web (encola); Worker/Runner (ejecuta); Claude Code headless (motor).
 | RF-M6-005 | Inyectar contexto de M4 en el prompt (recuperación selectiva). | Must |
 | RF-M6-006 | Reintentos con backoff y límite; visibilidad del estado en el dashboard. | Should |
 | RF-M6-007 | Modo "API key" enchufable (cambiar solo el runner) si se necesita robustez 24/7. | Could |
+| RF-M6-008 | **Burbuja de chat** flotante (FAB) como UI del asistente; consume `consulta_rag`. | Must |
+| RF-M6-009 | **Proponer/crear contexto**: tarea `proponer_contexto` → borrador(es) de `EntradaContexto`; **nunca publica**. | Must |
+| RF-M6-010 | Lectura de borradores solo para *awareness* (mostrar/evitar duplicados), **separada** de la recuperación de decisión (que es solo publicado). | Must |
+| RF-M6-011 | Cada sugerencia ofrece **Revisar y publicar** / **Guardar como borrador** / **Descartar**. | Must |
 
 ## 4. Requisitos no funcionales (RNF)
 | ID | Requisito | Métrica |
@@ -65,6 +75,10 @@ sequenceDiagram
 - **F-M6-2 · Runner headless** (contrato job↔Claude Code, parseo JSON, validación).
 - **F-M6-3 · Catálogo de tareas** (un esquema Zod entrada/salida por tipo).
 - **F-M6-4 · Reintentos y observabilidad**.
+- **F-M6-5 · Burbuja de chat** (FAB + panel/sheet; en móvil **encima de la bottom nav**; consume
+  `consulta_rag`; la respuesta llega vía Supabase Realtime o polling corto).
+- **F-M6-6 · Sugerir/crear contexto** (tarea `proponer_contexto`; **tarjeta de sugerencia** con
+  *Revisar y publicar* / *Guardar como borrador* / *Descartar*; la IA escribe **solo borradores**).
 
 ## 8. Contratos de tarea (resumen)
 | Tipo | Entrada | Salida |
@@ -74,13 +88,30 @@ sequenceDiagram
 | `conciliar_gasto` | factura + candidatos | gasto_id o "crear" |
 | `puntuar_evento` | evento + preferencias (M4) | relevancia [0,1] + motivo |
 | `resumen_semana` | eventos de la ventana | texto resumen |
-| `consulta_rag` | pregunta + contexto (M4) | respuesta + fuentes |
+| `consulta_rag` | pregunta + contexto (M4, **solo publicado**) | respuesta + fuentes |
+| `proponer_contexto` | petición/observación + contexto actual | borrador(es) de `EntradaContexto` (tipo, título, contenido, tags, vigencia) |
+
+## 8.1 Banco de contexto (M4): gobernanza del asistente
+Dos rutas de lectura **separadas** para que los borradores nunca dirijan decisiones:
+- `recuperarContexto` → **solo publicado + vigente** → **alimenta los prompts de decisión** (`consulta_rag`).
+- `listarContexto({ estados })` → incluye borradores → **solo para mostrar/curar** (awareness, evitar
+  duplicados); **jamás** entra al prompt de razonamiento.
+
+Escritura: la IA crea entradas con `estado='borrador'` (reusa `guardarEntrada`, que ya default-ea a
+borrador). **Publicar es acción del usuario** (`cambiarEstado`). Flujo de la sugerencia:
+- Pedido explícito ("creá una regla …") → crea el borrador y avisa.
+- Sugerencia propia de la IA → muestra la tarjeta; el usuario elige **Revisar y publicar** (abre el
+  editor de M4 precargado → publica), **Guardar como borrador** (persiste sin publicar) o **Descartar**.
 
 ## 9. Criterios de aceptación
 - [ ] Un job recorre `pendiente→ejecutando→ok` y persiste salida validada.
 - [ ] Salida no conforme → `error` reintentable, sin escribir basura.
 - [ ] El runner por defecto **no** usa API key (usa Claude Code/suscripción).
 - [ ] El contexto inyectado proviene de M4 y queda trazado.
+- [ ] La recuperación de decisión devuelve **solo** publicado+vigente; los borradores nunca entran al prompt.
+- [ ] La IA crea **borradores**; ninguno queda publicado sin acción del usuario.
+- [ ] La burbuja responde una `consulta_rag` end-to-end **con fuentes** (citando entradas de M4).
+- [ ] Cada sugerencia ofrece **Revisar y publicar** / **Guardar como borrador** / **Descartar**.
 
 ## 10. Riesgos y decisiones abiertas
 - **Fiabilidad headless en VPS 24/7** (login/ToS): mitigación = runner en tu máquina; modo API key enchufable.
