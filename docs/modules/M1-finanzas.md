@@ -86,7 +86,7 @@ La DB de Notion confirmó el modelo (página *Finances* → 2 bases):
 - UI: `app/(dashboard)/finanzas` + componentes de tabla/gráficas.
 
 ## 7. Funcionalidades
-- **F-M1-1 · Sync Notion↔Supabase** — pull incremental por cursor; upsert por `notion_page_id`; escritura a Notion en acciones del usuario.
+- **F-M1-1 · Sync Notion↔Supabase** — pull incremental por cursor; upsert por `notion_page_id`; escritura a Notion en acciones del usuario. **Mark-and-sweep de borrados:** lo que ya no viene de Notion se marca `deleted_at` (soft-delete); la UI lee solo activos (`deleted_at is null`). Guarda anti-borrado masivo: el barrido no corre si el query trajo 0 registros. Migración `0004_soft_delete.sql`.
 - **F-M1-2 · Reportes y analítica** — agregados por mes/categoría/balance (vistas SQL en Supabase).
 - **F-M1-3 · Conciliación factura↔gasto** — empareja por importe+fecha+proveedor; si no hay match, crea gasto; deja `FACTURA.estado=conciliada`. (Usa M6 para el matching difuso.)
 - **F-M1-4 · Alta/edición manual** — formulario con Zod; refleja en Notion.

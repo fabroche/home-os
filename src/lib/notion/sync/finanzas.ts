@@ -11,9 +11,12 @@ import type { Movimiento, Deuda } from "@/types/finanzas";
  * Sync Notion → Supabase (modelo híbrido). Lee las DBs de Notion (paginado +
  * rate-limited), mapea a dominio y hace UPSERT por `notion_page_id`.
  *
- * Por ahora es un sync COMPLETO (idempotente) en cada ejecución; el incremental
- * por `sync_state.last_edited` y el borrado de páginas eliminadas en Notion son
- * mejoras futuras (TODO). Lo invoca el worker (cron) y el script `sync:finanzas`.
+ * Es un sync COMPLETO (idempotente) en cada ejecución con **mark-and-sweep** de
+ * borrados: las páginas activas se upsertan con `synced_at = runTs` y `deleted_at
+ * = null` (reviven si reaparecen); luego se marcan como borradas (`deleted_at`)
+ * las filas que no se tocaron esta corrida (ya no existen en Notion). La UI lee
+ * solo activos (deleted_at is null). El incremental por `sync_state.last_edited`
+ * es mejora futura. Lo invoca el worker (cron) y el script `sync:finanzas`.
  */
 const movimientoRow = (m: Movimiento, now: string) => ({
   notion_page_id: m.notionPageId,
@@ -29,6 +32,7 @@ const movimientoRow = (m: Movimiento, now: string) => ({
   url: m.url ?? null,
   ultima_edicion: m.ultimaEdicion,
   synced_at: now,
+  deleted_at: null,
 });
 
 const deudaRow = (d: Deuda, now: string) => ({
@@ -40,6 +44,7 @@ const deudaRow = (d: Deuda, now: string) => ({
   url: d.url ?? null,
   ultima_edicion: d.ultimaEdicion,
   synced_at: now,
+  deleted_at: null,
 });
 
 /** Re-sincroniza una sola página de Presupuesto tras escribir en Notion. */
@@ -62,6 +67,29 @@ export async function syncDeudaById(pageId: string): Promise<void> {
   if (error) throw new Error(`syncDeudaById: ${error.message}`);
 }
 
+/**
+ * Marca como borradas (soft-delete) las filas que no se tocaron en esta corrida,
+ * es decir, las que ya no vienen de Notion. Solo se ejecuta si el query trajo al
+ * menos una página: así un fallo de red (0 resultados) nunca vacía el espejo.
+ * El barrido por `synced_at < runTs` evita un `IN (...)` con miles de ids.
+ */
+async function sweepBorrados(
+  sb: ReturnType<typeof createSupabaseServiceClient>,
+  tabla: "movimiento" | "deuda",
+  runTs: string,
+  vinieron: number,
+): Promise<number> {
+  if (vinieron === 0) return 0;
+  const { data, error } = await sb
+    .from(tabla)
+    .update({ deleted_at: runTs })
+    .lt("synced_at", runTs)
+    .is("deleted_at", null)
+    .select("notion_page_id");
+  if (error) throw new Error(`sweep ${tabla}: ${error.message}`);
+  return data?.length ?? 0;
+}
+
 export async function syncFinanzas() {
   const sb = createSupabaseServiceClient();
   const now = new Date().toISOString();
@@ -73,6 +101,7 @@ export async function syncFinanzas() {
     const { error } = await sb.from("movimiento").upsert(movRows, { onConflict: "notion_page_id" });
     if (error) throw new Error(`upsert movimiento: ${error.message}`);
   }
+  const movimientosBorrados = await sweepBorrados(sb, "movimiento", now, movRows.length);
 
   // --- Deudas_Personales → deuda ---
   const deudas = (await queryDatabase(DEUDAS.id)).map(toDeuda);
@@ -81,6 +110,7 @@ export async function syncFinanzas() {
     const { error } = await sb.from("deuda").upsert(deudaRows, { onConflict: "notion_page_id" });
     if (error) throw new Error(`upsert deuda: ${error.message}`);
   }
+  const deudasBorradas = await sweepBorrados(sb, "deuda", now, deudaRows.length);
 
   // --- sync_state (marca de la última corrida) ---
   const maxEdit = (arr: { ultimaEdicion: string }[]) =>
@@ -93,5 +123,10 @@ export async function syncFinanzas() {
     { onConflict: "fuente" },
   );
 
-  return { movimientos: movRows.length, deudas: deudaRows.length };
+  return {
+    movimientos: movRows.length,
+    deudas: deudaRows.length,
+    movimientosBorrados,
+    deudasBorrados: deudasBorradas,
+  };
 }

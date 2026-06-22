@@ -35,7 +35,14 @@ import {
  */
 
 export type SyncResult =
-  | { ok: true; movimientos: number; deudas: number; at: string }
+  | {
+      ok: true;
+      movimientos: number;
+      deudas: number;
+      movimientosBorrados: number;
+      deudasBorrados: number;
+      at: string;
+    }
   | { ok: false; error: string };
 
 export type WriteResult =

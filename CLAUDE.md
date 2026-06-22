@@ -74,7 +74,8 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
   la UI lee de Supabase; KPIs, gastos por categoría, resumen mensual y deudas. **Escritura a Notion** (modelo
   híbrido): editar `status` (Pendiente/Pagado), alta de gastos/deudas con firma de importe, subida de
   **factura/comprobante** a Storage público + enlace en Notion, y **sync manual** desde la UI. Deudas = saldo
-  neto por persona (pendiente vs por cobrar). Migraciones `0001`/`0003`.
+  neto por persona (pendiente vs por cobrar). El sync propaga **borrados** de Notion vía soft-delete
+  (mark-and-sweep `deleted_at`; la UI lee solo activos). Migraciones `0001`/`0003`/`0004`.
 - **M7 · Auth**: email+contraseña single-user; login/logout **en cliente** (cookie fiable tras Traefik);
   `src/proxy.ts` (middleware Next 16) protege rutas (fail-closed). Usuario en Supabase, sin SMTP aún.
 - **M4 · Banco de contexto**: CRUD de entradas tipadas (tags + vigencia + estado) y recuperación selectiva
