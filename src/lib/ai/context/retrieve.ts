@@ -5,6 +5,7 @@ import {
   type RecuperarContextoParams,
   type FragmentoContexto,
   type TipoContexto,
+  type EstadoContexto,
 } from "@/types/contexto";
 
 /**
@@ -43,6 +44,36 @@ type RpcRow = {
   tags: string[] | null;
   score: number;
 };
+
+/**
+ * Lectura de **awareness** del banco de contexto: lista entradas (incluye
+ * borradores) para que el asistente las muestre o evite duplicarlas al PROPONER.
+ * ⚠️ NO es para decidir: las decisiones usan `recuperarContexto` (solo publicado).
+ */
+export async function listarContexto(
+  userId: string,
+  estados: EstadoContexto[] = ["publicado", "borrador"],
+  limite = 50,
+): Promise<FragmentoContexto[]> {
+  const sb = createSupabaseServiceClient();
+  const { data, error } = await sb
+    .from("entrada_contexto")
+    .select("id, tipo, titulo, contenido, estado")
+    .eq("user_id", userId)
+    .in("estado", estados)
+    .order("updated_at", { ascending: false })
+    .limit(limite);
+  if (error) throw new Error(`listarContexto: ${error.message}`);
+  type Row = { id: string; tipo: TipoContexto; titulo: string; contenido: string };
+  return ((data as Row[] | null) ?? []).map((r) => ({
+    id: r.id,
+    tipo: r.tipo,
+    titulo: r.titulo,
+    contenido: r.contenido,
+    tags: [],
+    score: 0,
+  }));
+}
 
 export async function recuperarContexto(
   userId: string,

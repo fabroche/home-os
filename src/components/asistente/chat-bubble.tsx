@@ -2,16 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { preguntarAsistente, consultarJob } from "@/lib/actions/ai";
+import { preguntarAsistente, proponerContexto, consultarJob } from "@/lib/actions/ai";
 import { ChatPanel } from "@/components/asistente/chat-panel";
 import type { ChatMsg } from "@/components/asistente/chat-message";
 
 /**
- * Burbuja de chat del Asistente (M6 · F-M6-5). FAB flotante que abre el panel;
- * encola `consulta_rag` y **sondea** (polling) el resultado hasta `ok|error`.
- * En móvil el FAB va encima de la bottom nav. `pollMs`/`maxIntentos` inyectables
- * para tests. La respuesta llega por polling (Realtime es mejora futura).
+ * Burbuja de chat del Asistente (M6 · F-M6-5/6). FAB flotante que abre el panel;
+ * según la intención encola `consulta_rag` (preguntar) o `proponer_contexto`
+ * (enseñar), y **sondea** el resultado. En móvil el FAB va encima de la bottom nav.
+ * `pollMs`/`maxIntentos` inyectables para tests. (Respuesta por polling; Realtime luego.)
  */
+
+/** Heurística MVP de intención (a reemplazar por clasificación del modelo). */
+export function detectarIntencion(texto: string): "preguntar" | "ensenar" {
+  const t = texto.toLowerCase();
+  if (
+    /\b(recu[eé]rdame|an[oó]tame|reg[ií]stra|registr[aá]|guarda(r)? (esto|esta|en (el )?contexto)|crea(r|á)? (una |la )?(regla|nota|preferencia|entrada))\b/.test(
+      t,
+    )
+  ) {
+    return "ensenar";
+  }
+  return "preguntar";
+}
+
 export function ChatBubble({
   defaultOpen = false,
   pollMs = 1500,
@@ -33,6 +47,7 @@ export function ChatBubble({
   }
 
   async function onSend(texto: string) {
+    const intencion = detectarIntencion(texto);
     const userMsgId = crypto.randomUUID();
     const aMsgId = crypto.randomUUID();
     setMessages((ms) => [
@@ -42,7 +57,10 @@ export function ChatBubble({
     ]);
     setPending(true);
 
-    const res = await preguntarAsistente({ pregunta: texto });
+    const res =
+      intencion === "ensenar"
+        ? await proponerContexto({ peticion: texto })
+        : await preguntarAsistente({ pregunta: texto });
     if (!res.ok) {
       actualizar(aMsgId, { contenido: res.error, pendiente: false });
       setPending(false);
@@ -54,7 +72,27 @@ export function ChatBubble({
       intentos++;
       const st = await consultarJob(res.jobId);
       if (st.estado === "ok") {
-        actualizar(aMsgId, { contenido: st.respuesta, fuentes: st.fuentes, pendiente: false });
+        if (st.tipo === "proponer_contexto") {
+          actualizar(aMsgId, {
+            contenido: st.borradores.length
+              ? "Te propongo guardar esto:"
+              : "No encontré nada nuevo para registrar.",
+            pendiente: false,
+          });
+          if (st.borradores.length) {
+            setMessages((ms) => [
+              ...ms,
+              ...st.borradores.map((b) => ({
+                id: crypto.randomUUID(),
+                rol: "assistant" as const,
+                contenido: "",
+                borrador: b,
+              })),
+            ]);
+          }
+        } else {
+          actualizar(aMsgId, { contenido: st.respuesta, fuentes: st.fuentes, pendiente: false });
+        }
         setPending(false);
         return;
       }
@@ -87,11 +125,6 @@ export function ChatBubble({
   }
 
   return (
-    <ChatPanel
-      messages={messages}
-      pending={pending}
-      onSend={onSend}
-      onClose={() => setOpen(false)}
-    />
+    <ChatPanel messages={messages} pending={pending} onSend={onSend} onClose={() => setOpen(false)} />
   );
 }
