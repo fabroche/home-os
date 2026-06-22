@@ -111,8 +111,8 @@ sequenceDiagram
 | Server Action | `conciliarFactura` | factura_id, gasto_id? | estado | usuario/IA |
 
 ## 9. Componentes UI (DoD)
-Story + Test RTL co-locados (ver `docs/transversal/calidad-y-pruebas.md`). La deuda de
-stories está trackeada en `src/components/dod-stories.test.ts` (`DEUDA_STORY`).
+Story + Test RTL co-locados (ver `docs/transversal/calidad-y-pruebas.md`). El enforcement vive en
+`src/components/dod-coverage.test.ts` (`DEUDA_STORY` / `DEUDA_TEST`, hoy vacías).
 | Componente | Story | Test RTL | Estado |
 |------------|:-----:|:--------:|--------|
 | `movimientos-table` (filtros/orden/reflow móvil) | ✅ | ✅ | ✅ |
@@ -121,7 +121,7 @@ stories está trackeada en `src/components/dod-stories.test.ts` (`DEUDA_STORY`).
 | `estado-toggle` | ✅ | ✅ | ✅ |
 | `archivos-cell` (subida) | ✅ | ✅ | ✅ |
 | `sync-button` | ✅ | ✅ | ✅ |
-| `bar-list` | ✅ | ⬜ | falta test |
+| `bar-list` | ✅ | ✅ | ✅ |
 | `DialogoConciliacion` (M3/M6) | ⬜ | ⬜ | pendiente |
 
 ## 10. Criterios de aceptación

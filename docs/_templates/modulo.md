@@ -56,7 +56,7 @@ _Ver `docs/transversal/calidad-y-pruebas.md` y `docs/transversal/mobile-first.md
 - [ ] **DoD móvil** cumplido (mobile-first: tablas, touch targets, sin scroll horizontal, light+dark).
 - [ ] Flujos críticos con **E2E** (si aplica).
 - [ ] Migraciones Supabase **aplicadas** en prod (si las hay).
-- [ ] `typecheck` + `lint` + `test` + `build` en verde; `dod-stories.test.ts` sin deuda nueva.
+- [ ] `typecheck` + `lint` + `test` + `build` en verde; `dod-coverage.test.ts` sin deuda nueva.
 - [ ] Documentación del módulo y **estado en `CLAUDE.md`** actualizados.
 
 ## 12. Riesgos y decisiones abiertas
