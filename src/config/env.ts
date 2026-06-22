@@ -49,6 +49,8 @@ const envSchema = z.object({
   // IA de runtime — Claude Code headless (suscripción, sin API key)
   CLAUDE_CLI_PATH: z.string().default("claude"),
   CLAUDE_WORKDIR: z.string().default("./worker/agent"),
+  CLAUDE_CODE_OAUTH_TOKEN: z.string().optional(), // `claude setup-token` (~1 año); lo lee el runner
+  AI_POLL_MS: z.coerce.number().int().positive().default(3000), // frecuencia del drain de ai_jobs
 });
 
 // Trata las variables vacías ("") como ausentes, para que los placeholders

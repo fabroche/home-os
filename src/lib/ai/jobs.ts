@@ -16,6 +16,7 @@ import {
 
 type JobRow = {
   id: string;
+  user_id: string;
   tipo: string;
   payload: unknown;
   estado: string;
@@ -29,6 +30,7 @@ type JobRow = {
 function rowToJob(r: JobRow): AiJob {
   return {
     id: r.id,
+    userId: r.user_id,
     tipo: r.tipo as AiJobTipo,
     payload: r.payload,
     estado: r.estado as EstadoJob,

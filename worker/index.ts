@@ -23,6 +23,21 @@ async function runSync() {
   }
 }
 
+let draining = false;
+async function runDrain() {
+  if (draining) return; // evita solapamiento entre ticks
+  draining = true;
+  try {
+    const { drenarCola } = await import("@/lib/ai/runner");
+    const n = await drenarCola();
+    if (n > 0) console.warn(`[worker] ai_jobs procesados: ${n}`);
+  } catch (err) {
+    console.error("[worker] ai_jobs ERROR:", err instanceof Error ? err.message : err);
+  } finally {
+    draining = false;
+  }
+}
+
 async function main() {
   try {
     process.loadEnvFile(".env.local");
@@ -36,9 +51,12 @@ async function main() {
     process.exit(1);
   }
 
-  console.warn(`[worker] iniciando · sync finanzas con cron "${env.SYNC_CRON}"`);
+  console.warn(
+    `[worker] iniciando · sync "${env.SYNC_CRON}" · drain ai_jobs cada ${env.AI_POLL_MS}ms`,
+  );
   await runSync(); // corrida inicial al arrancar
   cron.schedule(env.SYNC_CRON, runSync);
+  setInterval(runDrain, env.AI_POLL_MS); // drena la cola de IA con frecuencia (chat responsivo)
 }
 
 main().catch((err) => {
