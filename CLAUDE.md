@@ -43,6 +43,8 @@ La app encola tareas en `ai_jobs` (Supabase) y el `worker` las drena con el runn
 - **Server Actions**: `'use server'` + Zod en `src/lib/actions/`.
 - **`cn()`** (`src/lib/utils.ts`) para clases condicionales, siempre.
 - **Tailwind v4**: nunca `tailwind.config.js`; tokens en `globals.css @theme`.
+- **Mobile-first (OBLIGATORIO)**: la base de estilos es la vista móvil; se escala con `sm:`/`md:`/`lg:`.
+  Ningún módulo se siente "desktop encogido". Patrones y DoD móvil en `docs/transversal/mobile-first.md`.
 - **Notion**: cero `as any`, paginar siempre, rate-limit+retry, schema registry. Ver `agente/reglas-notion.md`.
 - **date-fns** (no Moment). Credenciales de cuentas **cifradas** en Supabase (nunca en `.env` ni en texto plano).
 
@@ -62,9 +64,9 @@ La app encola tareas en `ai_jobs` (Supabase) y el `worker` las drena con el runn
 | M6 | Asistente IA (jobs headless) |
 | M7 | Auth & seguridad (single-user) |
 
-## Estado actual (2026-06-21) — EN PRODUCCIÓN
+## Estado actual (2026-06-22) — EN PRODUCCIÓN
 Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **worker** (sync 24/7) +
-**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 60 tests verdes.
+**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 68 tests verdes.
 
 **Implementado:**
 - **T1 · Capa Notion** (`src/lib/notion/`): client (fetch nativo undici — el `node-fetch@2` del SDK fallaba
@@ -76,6 +78,8 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
   **factura/comprobante** a Storage público + enlace en Notion, y **sync manual** desde la UI. Deudas = saldo
   neto por persona (pendiente vs por cobrar). El sync propaga **borrados** de Notion vía soft-delete
   (mark-and-sweep `deleted_at`; la UI lee solo activos). Migraciones `0001`/`0003`/`0004`.
+  **UX móvil:** tablas → tarjetas apiladas (`.reflow-cards` + `data-label`), tipografía fluida y touch
+  targets ≥44px (mobile-first).
 - **M7 · Auth**: email+contraseña single-user; login/logout **en cliente** (cookie fiable tras Traefik);
   `src/proxy.ts` (middleware Next 16) protege rutas (fail-closed). Usuario en Supabase, sin SMTP aún.
 - **M4 · Banco de contexto**: CRUD de entradas tipadas (tags + vigencia + estado) y recuperación selectiva
@@ -84,7 +88,9 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
 - **T5 · Sistema de diseño**: identidad editorial (Inter Tight + Instrument Serif italic, marca violeta
   `#4928fd`, light+dark con next-themes, motion discreto). Primitivas en `src/components/{ui,theme,motion}`.
   Header persistente (grupo `(dashboard)`) + **loading skeletons a medida**. **Storybook 10** (stories + a11y +
-  toggle de tema). Ver `docs/transversal/sistema-de-diseno.md`.
+  toggle de tema). **Navegación mobile-first:** bottom tab bar en móvil (`mobile-nav.tsx`, fuente única
+  `nav-items.tsx`) + nav-píldora en desktop. Ver `docs/transversal/sistema-de-diseno.md` y
+  `docs/transversal/mobile-first.md`.
 
 Los prerequisitos manuales de la escritura M1 (capacidades Insert/Update en Notion, columna `comprobante`,
 `NOTION_API_KEY` en la app, migración `0003`) están **completados** y la escritura funciona en prod.
