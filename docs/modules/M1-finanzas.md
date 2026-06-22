@@ -111,12 +111,18 @@ sequenceDiagram
 | Server Action | `conciliarFactura` | factura_id, gasto_id? | estado | usuario/IA |
 
 ## 9. Componentes UI (DoD)
-| Componente | Test RTL | Estado |
-|------------|:--------:|--------|
-| `TablaMovimientos` (filtros) | ⬜ | ⬜ |
-| `ResumenFinanciero` (KPIs) | ⬜ | ⬜ |
-| `GraficaGastosPorCategoria` | ⬜ | ⬜ |
-| `DialogoConciliacion` | ⬜ | ⬜ |
+Story + Test RTL co-locados (ver `docs/transversal/calidad-y-pruebas.md`). La deuda de
+stories está trackeada en `src/components/dod-stories.test.ts` (`DEUDA_STORY`).
+| Componente | Story | Test RTL | Estado |
+|------------|:-----:|:--------:|--------|
+| `movimientos-table` (filtros/orden/reflow móvil) | ⬜ | ✅ | parcial |
+| `nuevo-movimiento` (alta) | ⬜ | ✅ | parcial |
+| `nueva-deuda` (alta) | ⬜ | ✅ | parcial |
+| `estado-toggle` | ⬜ | ✅ | parcial |
+| `archivos-cell` (subida) | ⬜ | ✅ | parcial |
+| `sync-button` | ⬜ | ✅ | parcial |
+| `bar-list` | ✅ | ⬜ | parcial |
+| `DialogoConciliacion` (M3/M6) | ⬜ | ⬜ | pendiente |
 
 ## 10. Criterios de aceptación
 - [ ] Re-sincronizar no duplica registros.

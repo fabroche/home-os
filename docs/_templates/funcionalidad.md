@@ -31,4 +31,5 @@ flowchart TD
 **Endpoints/Server Actions/Jobs:** _…_
 **Criterios de aceptación:**
 - [ ] Dado … cuando … entonces …
+**DoD (obligatorio):** Story + Test RTL del componente · tests de lógica (services/mappers) · DoD móvil (mobile-first) · `typecheck`+`lint`+`test` verdes.
 **Dependencias:** _…_
