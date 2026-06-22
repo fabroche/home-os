@@ -34,7 +34,7 @@ function Kpi({
   return (
     <Card>
       <CardLabel>{label}</CardLabel>
-      <div className={`mt-2 text-3xl font-semibold nums ${accent ?? ""}`}>
+      <div className={`mt-2 text-2xl font-semibold nums sm:text-3xl ${accent ?? ""}`}>
         <AnimatedNumber value={value} currency="EUR" />
       </div>
     </Card>
@@ -60,12 +60,12 @@ export default async function FinanzasPage() {
   ].sort();
 
   return (
-    <main className="container-app max-w-5xl py-12">
+    <main className="container-app max-w-5xl py-8 sm:py-12">
       {/* Encabezado */}
       <Reveal>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-4xl">
+            <h1 className="text-3xl sm:text-4xl">
               <span className="serif-accent text-primary">Finanzas</span> al detalle
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -100,8 +100,8 @@ export default async function FinanzasPage() {
         <Reveal delay={0.05}>
           <section>
             <h2 className="mb-3 text-lg font-semibold">Resumen mensual</h2>
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-xl border border-border max-md:border-0">
+              <table className="reflow-cards w-full text-sm">
                 <thead className="bg-secondary text-left text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5 font-medium">Mes</th>
@@ -113,10 +113,10 @@ export default async function FinanzasPage() {
                 <tbody>
                   {meses.map((m) => (
                     <tr key={m.mes} className="border-t border-border transition-colors hover:bg-accent/50">
-                      <td className="px-4 py-2.5 capitalize">{mesLargo(m.mes)}</td>
-                      <td className="px-4 py-2.5 text-right nums text-income">{eur(m.ingresos)}</td>
-                      <td className="px-4 py-2.5 text-right nums text-expense">{eur(m.gastos)}</td>
-                      <td className="px-4 py-2.5 text-right nums font-medium">{eur(m.balance)}</td>
+                      <td className="px-4 py-2.5 capitalize" data-label="Mes">{mesLargo(m.mes)}</td>
+                      <td className="px-4 py-2.5 text-right nums text-income" data-label="Ingresos">{eur(m.ingresos)}</td>
+                      <td className="px-4 py-2.5 text-right nums text-expense" data-label="Gastos">{eur(m.gastos)}</td>
+                      <td className="px-4 py-2.5 text-right nums font-medium" data-label="Balance">{eur(m.balance)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -138,11 +138,11 @@ export default async function FinanzasPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Card>
               <CardLabel>Por pagar (debes)</CardLabel>
-              <div className="mt-2 text-3xl font-semibold nums text-debt">{eur(rd.total)}</div>
+              <div className="mt-2 text-2xl font-semibold nums text-debt sm:text-3xl">{eur(rd.total)}</div>
             </Card>
             <Card>
               <CardLabel>A favor · por cobrar</CardLabel>
-              <div className="mt-2 text-3xl font-semibold nums text-income">
+              <div className="mt-2 text-2xl font-semibold nums text-income sm:text-3xl">
                 {eur(rd.totalPorCobrar)}
               </div>
             </Card>
@@ -173,8 +173,8 @@ export default async function FinanzasPage() {
               )}
             </Card>
 
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-xl border border-border max-md:border-0">
+              <table className="reflow-cards w-full text-sm">
                 <thead className="bg-secondary text-left text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5 font-medium">Concepto</th>
@@ -185,9 +185,10 @@ export default async function FinanzasPage() {
                 <tbody>
                   {deudas.map((d) => (
                     <tr key={d.notionPageId} className="border-t border-border transition-colors hover:bg-accent/50">
-                      <td className="px-4 py-2.5">{d.concepto || "—"}</td>
-                      <td className="px-4 py-2.5">{d.persona ?? "—"}</td>
+                      <td className="px-4 py-2.5" data-label="Concepto">{d.concepto || "—"}</td>
+                      <td className="px-4 py-2.5" data-label="Persona">{d.persona ?? "—"}</td>
                       <td
+                        data-label="Movimiento"
                         className={`px-4 py-2.5 text-right nums ${
                           d.valor == null ? "" : d.valor < 0 ? "text-debt" : "text-income"
                         }`}

@@ -62,7 +62,7 @@ export function NuevoMovimiento() {
 
   if (!open) {
     return (
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <Button size="sm" className="max-sm:h-11 max-sm:px-5" onClick={() => setOpen(true)}>
         <Plus className="size-4" />
         Nuevo movimiento
       </Button>
