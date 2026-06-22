@@ -71,6 +71,7 @@ export async function listMovimientos(): Promise<Movimiento[]> {
   const { data, error } = await sb
     .from("movimiento")
     .select("*")
+    .is("deleted_at", null)
     .order("fecha", { ascending: false, nullsFirst: false });
   if (error) throw new Error(`listMovimientos: ${error.message}`);
   return (data as MovimientoRow[]).map(rowToMovimiento);
@@ -78,7 +79,7 @@ export async function listMovimientos(): Promise<Movimiento[]> {
 
 export async function listDeudas(): Promise<Deuda[]> {
   const sb = createSupabaseServiceClient();
-  const { data, error } = await sb.from("deuda").select("*");
+  const { data, error } = await sb.from("deuda").select("*").is("deleted_at", null);
   if (error) throw new Error(`listDeudas: ${error.message}`);
   return (data as DeudaRow[]).map(rowToDeuda);
 }

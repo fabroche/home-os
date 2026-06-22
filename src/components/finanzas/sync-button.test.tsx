@@ -19,14 +19,37 @@ beforeEach(() => {
 
 describe("SyncButton", () => {
   it("sincroniza y muestra el resultado, refrescando la vista", async () => {
-    syncFinanzasAction.mockResolvedValue({ ok: true, movimientos: 3, deudas: 2, at: "2026-06-21T10:00:00Z" });
+    syncFinanzasAction.mockResolvedValue({
+      ok: true,
+      movimientos: 3,
+      deudas: 2,
+      movimientosBorrados: 0,
+      deudasBorrados: 0,
+      at: "2026-06-21T10:00:00Z",
+    });
     render(<SyncButton lastSync={null} />);
 
     fireEvent.click(screen.getByRole("button", { name: /sincronizar/i }));
     await waitFor(() =>
       expect(screen.getByText(/3 movimientos, 2 deudas/i)).toBeInTheDocument(),
     );
+    expect(screen.queryByText(/eliminados/i)).not.toBeInTheDocument();
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("muestra los registros eliminados cuando el sync los propaga", async () => {
+    syncFinanzasAction.mockResolvedValue({
+      ok: true,
+      movimientos: 3,
+      deudas: 2,
+      movimientosBorrados: 2,
+      deudasBorrados: 1,
+      at: "2026-06-21T10:00:00Z",
+    });
+    render(<SyncButton lastSync={null} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /sincronizar/i }));
+    await waitFor(() => expect(screen.getByText(/3 eliminados/i)).toBeInTheDocument());
   });
 
   it("muestra el error si el sync falla", async () => {

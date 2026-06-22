@@ -24,9 +24,11 @@ export function SyncButton({ lastSync }: { lastSync: string | null }) {
       const res = await syncFinanzasAction();
       if (res.ok) {
         setSyncAt(res.at);
+        const borrados = res.movimientosBorrados + res.deudasBorrados;
+        const sufijo = borrados > 0 ? ` · ${borrados} eliminados` : "";
         setEstado({
           tipo: "ok",
-          texto: `Actualizado · ${res.movimientos} movimientos, ${res.deudas} deudas`,
+          texto: `Actualizado · ${res.movimientos} movimientos, ${res.deudas} deudas${sufijo}`,
         });
         router.refresh(); // re-renderiza el server component con los datos frescos
       } else {
