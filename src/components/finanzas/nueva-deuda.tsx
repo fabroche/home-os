@@ -64,7 +64,7 @@ export function NuevaDeuda({ personas }: { personas: string[] }) {
 
   if (!open) {
     return (
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <Button size="sm" className="max-sm:h-11 max-sm:px-5" onClick={() => setOpen(true)}>
         <Plus className="size-4" />
         Deuda / pago
       </Button>
