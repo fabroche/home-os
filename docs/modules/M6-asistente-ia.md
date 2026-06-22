@@ -38,6 +38,8 @@ App web (encola); Worker/Runner (ejecuta); Claude Code headless (motor).
 | RF-M6-009 | **Proponer/crear contexto**: tarea `proponer_contexto` → borrador(es) de `EntradaContexto`; **nunca publica**. | Must |
 | RF-M6-010 | Lectura de borradores solo para *awareness* (mostrar/evitar duplicados), **separada** de la recuperación de decisión (que es solo publicado). | Must |
 | RF-M6-011 | Cada sugerencia ofrece **Revisar y publicar** / **Guardar como borrador** / **Descartar**. | Must |
+| RF-M6-012 | Auth del runner por **`CLAUDE_CODE_OAUTH_TOKEN`** (`claude setup-token`, ~1 año, suscripción). | Must |
+| RF-M6-013 | **Rotación de token desde la app**: campo admin que guarda el token **cifrado** (lo lee el runner) + **banner de estado** del asistente si falla la auth. | Should |
 
 ## 4. Requisitos no funcionales (RNF)
 | ID | Requisito | Métrica |
@@ -76,7 +78,7 @@ sequenceDiagram
 - **F-M6-3 · Catálogo de tareas** (un esquema Zod entrada/salida por tipo).
 - **F-M6-4 · Reintentos y observabilidad**.
 - **F-M6-5 · Burbuja de chat** (FAB + panel/sheet; en móvil **encima de la bottom nav**; consume
-  `consulta_rag`; la respuesta llega vía Supabase Realtime o polling corto).
+  `consulta_rag`; la respuesta llega por **polling corto** en el MVP (Realtime como mejora futura)).
 - **F-M6-6 · Sugerir/crear contexto** (tarea `proponer_contexto`; **tarjeta de sugerencia** con
   *Revisar y publicar* / *Guardar como borrador* / *Descartar*; la IA escribe **solo borradores**).
 
@@ -114,6 +116,12 @@ borrador). **Publicar es acción del usuario** (`cambiarEstado`). Flujo de la su
 - [ ] Cada sugerencia ofrece **Revisar y publicar** / **Guardar como borrador** / **Descartar**.
 
 ## 10. Riesgos y decisiones abiertas
-- **Fiabilidad headless en VPS 24/7** (login/ToS): mitigación = runner en tu máquina; modo API key enchufable.
+- **Auth headless en VPS 24/7 — RESUELTO:** runner en el **worker del VPS** con
+  `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`, token de ~1 año, suscripción → coste 0). El token se
+  genera localmente y se rota ~anualmente; la app expone un **campo admin (cifrado) + banner de estado**
+  para rotarlo sin SSH ni redeploy. No hay re-login automático desde la app (el OAuth es interactivo,
+  atado a la cuenta Anthropic). **Plan B:** `ANTHROPIC_API_KEY` (sin expiración, pago por token) —
+  enchufable cambiando solo el runner (RF-M6-007).
+- **Entrega de respuesta:** **polling corto** en el MVP; Supabase Realtime como mejora.
 - Definir formato exacto de invocación de Claude Code (flags, `--output-format json`, system prompt, skills disponibles para el agente).
 - Concurrencia del runner (cuántos jobs en paralelo sin saturar).
