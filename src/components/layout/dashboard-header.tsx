@@ -6,14 +6,7 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LogoutButton } from "@/components/layout/logout-button";
-
-const NAV = [
-  { href: "/", label: "Inicio" },
-  { href: "/finanzas", label: "Finanzas" },
-  { href: "/calendario", label: "Calendario" },
-  { href: "/backoffice", label: "Backoffice" },
-  { href: "/contexto", label: "Contexto" },
-];
+import { NAV, isActiveHref } from "@/components/layout/nav-items";
 
 export function DashboardHeader() {
   const pathname = usePathname();
@@ -26,8 +19,7 @@ export function DashboardHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const isActive = (href: string) => isActiveHref(pathname, href);
 
   return (
     <header className="sticky top-0 z-50 w-full">
@@ -72,24 +64,6 @@ export function DashboardHeader() {
             <LogoutButton />
           </div>
         </nav>
-
-        {/* Navegación móvil */}
-        <div className="mt-2 flex gap-1 overflow-x-auto md:hidden">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className={cn(
-                "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                isActive(n.href)
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-foreground/[0.04] text-muted-foreground",
-              )}
-            >
-              {n.label}
-            </Link>
-          ))}
-        </div>
       </div>
     </header>
   );
