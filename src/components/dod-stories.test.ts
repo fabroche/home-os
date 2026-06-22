@@ -19,21 +19,8 @@ const ROOT = join(process.cwd(), "src", "components");
 const SIN_STORY_NA = new Set(["layout/nav-items", "theme/theme-provider"]);
 
 // Deuda DoD conocida: componentes visuales aún sin story. Vaciar al cerrarla.
-const DEUDA_STORY = new Set([
-  "ui/count-up",
-  "ui/skeleton",
-  "layout/logout-button",
-  "layout/module-stub",
-  "motion/reveal",
-  "finanzas/estado-toggle",
-  "finanzas/archivos-cell",
-  "finanzas/movimientos-table",
-  "finanzas/nueva-deuda",
-  "finanzas/nuevo-movimiento",
-  "finanzas/sync-button",
-  "contexto/editor-entrada",
-  "contexto/lista-contexto",
-]);
+// ✅ Saldada por completo: todos los componentes visuales tienen story co-locada.
+const DEUDA_STORY = new Set<string>([]);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

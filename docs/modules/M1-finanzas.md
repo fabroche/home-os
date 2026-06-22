@@ -115,13 +115,13 @@ Story + Test RTL co-locados (ver `docs/transversal/calidad-y-pruebas.md`). La de
 stories está trackeada en `src/components/dod-stories.test.ts` (`DEUDA_STORY`).
 | Componente | Story | Test RTL | Estado |
 |------------|:-----:|:--------:|--------|
-| `movimientos-table` (filtros/orden/reflow móvil) | ⬜ | ✅ | parcial |
-| `nuevo-movimiento` (alta) | ⬜ | ✅ | parcial |
-| `nueva-deuda` (alta) | ⬜ | ✅ | parcial |
-| `estado-toggle` | ⬜ | ✅ | parcial |
-| `archivos-cell` (subida) | ⬜ | ✅ | parcial |
-| `sync-button` | ⬜ | ✅ | parcial |
-| `bar-list` | ✅ | ⬜ | parcial |
+| `movimientos-table` (filtros/orden/reflow móvil) | ✅ | ✅ | ✅ |
+| `nuevo-movimiento` (alta) | ✅ | ✅ | ✅ |
+| `nueva-deuda` (alta) | ✅ | ✅ | ✅ |
+| `estado-toggle` | ✅ | ✅ | ✅ |
+| `archivos-cell` (subida) | ✅ | ✅ | ✅ |
+| `sync-button` | ✅ | ✅ | ✅ |
+| `bar-list` | ✅ | ⬜ | falta test |
 | `DialogoConciliacion` (M3/M6) | ⬜ | ⬜ | pendiente |
 
 ## 10. Criterios de aceptación
