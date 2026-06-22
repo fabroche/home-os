@@ -20,17 +20,18 @@ Además:
 - **UX móvil** = cumplir el **DoD móvil** de `mobile-first.md` (mobile-first es obligatorio).
 - Lo vigila el subagente `qa-testing`.
 
-### Enforcement automatizado de stories
-`src/components/dod-stories.test.ts` recorre `src/components/**` y **falla** si un componente
-visual no tiene su `*.stories.tsx` co-locada. La deuda conocida vive en la lista `DEUDA_STORY`
-del propio test (visible y trackeada); al añadir una story hay que **quitar** el componente de
-esa lista o el test falla. Así un componente nuevo no puede entrar sin story, y la deuda solo
-puede decrecer. (Los módulos sin componente visual van en `SIN_STORY_NA`.)
+### Enforcement automatizado (stories + tests)
+`src/components/dod-coverage.test.ts` recorre `src/components/**` y **falla** si un componente
+visual no tiene su `*.stories.tsx` **y** su `*.test.tsx|ts` co-locados. Las deudas conocidas viven
+en las listas `DEUDA_STORY` / `DEUDA_TEST` del propio test (visibles y trackeadas); al añadir el
+artefacto hay que **quitar** el componente de la lista o el test falla. Así un componente nuevo no
+puede entrar sin story+test, y la deuda solo puede decrecer. (Lo no visual va en `SIN_STORY_NA` /
+`SIN_TEST_NA`.) **Hoy ambas deudas están vacías.**
 
 ### DoD de cierre de módulo
 Un módulo **no se marca como hecho** sin el checklist de cierre (sección 11 de la plantilla
 `_templates/modulo.md`): stories+tests de cada componente, tests de lógica, DoD móvil,
-migraciones aplicadas, `typecheck`+`lint`+`test`+`build` verdes (incl. `dod-stories.test.ts`),
+migraciones aplicadas, `typecheck`+`lint`+`test`+`build` verdes (incl. `dod-coverage.test.ts`),
 y estado en `CLAUDE.md` actualizado.
 
 ## Qué testear con prioridad

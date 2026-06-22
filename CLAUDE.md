@@ -66,7 +66,7 @@ La app encola tareas en `ai_jobs` (Supabase) y el `worker` las drena con el runn
 
 ## Estado actual (2026-06-22) — EN PRODUCCIÓN
 Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **worker** (sync 24/7) +
-**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 68 tests verdes.
+**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 141 tests verdes.
 
 **Implementado:**
 - **T1 · Capa Notion** (`src/lib/notion/`): client (fetch nativo undici — el `node-fetch@2` del SDK fallaba
