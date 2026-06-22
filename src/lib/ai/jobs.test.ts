@@ -39,6 +39,7 @@ import { encolar, tomarSiguiente, marcar } from "@/lib/ai/jobs";
 
 const ROW = {
   id: "job-1",
+  user_id: "user-1",
   tipo: "consulta_rag",
   payload: { pregunta: "hola" },
   estado: "pendiente",

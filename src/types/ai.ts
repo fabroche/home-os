@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TIPOS_CONTEXTO } from "@/types/contexto";
 
 /**
  * Tipos de dominio del Asistente IA (M6). La cola `ai_jobs` guarda tareas tipadas
@@ -44,9 +45,36 @@ export const JOB_PAYLOAD_SCHEMAS = {
 
 export type TipoEncolable = keyof typeof JOB_PAYLOAD_SCHEMAS;
 
+// --- Salidas validadas por tipo (el runner valida ANTES de persistir) --------
+export const ConsultaRagOutputSchema = z.object({
+  respuesta: z.string().trim().min(1),
+  fuentes: z.array(z.object({ id: z.string(), titulo: z.string() })).default([]),
+});
+export type ConsultaRagOutput = z.infer<typeof ConsultaRagOutputSchema>;
+
+/** Borrador de contexto que propone la IA (sin id/estado; se inserta como borrador). */
+export const BorradorContextoSchema = z.object({
+  tipo: z.enum(TIPOS_CONTEXTO),
+  titulo: z.string().trim().min(1).max(200),
+  contenido: z.string().trim().min(1),
+  tags: z.array(z.string()).default([]),
+});
+export type BorradorContexto = z.infer<typeof BorradorContextoSchema>;
+
+export const ProponerContextoOutputSchema = z.object({
+  borradores: z.array(BorradorContextoSchema).min(1).max(5),
+});
+export type ProponerContextoOutput = z.infer<typeof ProponerContextoOutputSchema>;
+
+export const JOB_OUTPUT_SCHEMAS = {
+  consulta_rag: ConsultaRagOutputSchema,
+  proponer_contexto: ProponerContextoOutputSchema,
+} satisfies Partial<Record<AiJobTipo, z.ZodTypeAny>>;
+
 /** DTO de dominio de un job (mapea la fila de `ai_jobs`). */
 export type AiJob = {
   id: string;
+  userId: string;
   tipo: AiJobTipo;
   payload: unknown;
   estado: EstadoJob;
