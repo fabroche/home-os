@@ -12,14 +12,14 @@ import { Input } from "@/components/ui/input";
 
 type Resuelto = "creado" | "cancelado";
 
-/** Tipos de gasto (la acción registra gastos; deja fuera Ingreso/Deuda). */
 const TIPOS_GASTO = TIPOS.filter((t) => t.startsWith("Gasto"));
+const TIPOS_INGRESO = TIPOS.filter((t) => t.startsWith("Ingreso"));
 
 /**
- * Tarjeta de acción del Asistente (M6 · tool calling). La IA **propone** un gasto;
- * el usuario lo **revisa, edita y confirma**. La escritura SOLO ocurre al confirmar
- * (gobernanza "propone → aprueba → crea"): la IA nunca ejecuta. Confirmar llama a
- * `crearMovimiento` (Server Action con auth + validación Zod que escribe en Notion).
+ * Tarjeta de acción del Asistente (M6 · tool calling). La IA **propone** un movimiento
+ * (gasto o ingreso); el usuario lo **revisa, edita y confirma**. La escritura SOLO ocurre
+ * al confirmar (gobernanza "propone → aprueba → crea"): la IA nunca ejecuta. Confirmar
+ * llama a `crearMovimiento` (Server Action con auth + validación Zod que escribe en Notion).
  */
 export function ActionCard({
   propuesta,
@@ -36,6 +36,10 @@ export function ActionCard({
   function set<K extends keyof CrearMovimientoInput>(k: K, v: CrearMovimientoInput[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
+
+  const esIngreso = form.tipo.startsWith("Ingreso");
+  const tiposOpts = esIngreso ? TIPOS_INGRESO : TIPOS_GASTO;
+  const titulo = esIngreso ? "Registrar ingreso" : "Registrar gasto";
 
   function confirmar() {
     setError(null);
@@ -54,7 +58,7 @@ export function ActionCard({
     return (
       <Card className="flex items-center gap-2 text-sm text-muted-foreground">
         <Check className="size-4 text-income" />
-        {resuelto === "creado" ? "Gasto creado" : "Cancelado"}:{" "}
+        {resuelto === "creado" ? (esIngreso ? "Ingreso creado" : "Gasto creado") : "Cancelado"}:{" "}
         <span className="font-medium text-foreground">{form.nombre}</span>
       </Card>
     );
@@ -64,7 +68,7 @@ export function ActionCard({
   return (
     <Card>
       <div className="flex flex-wrap items-center gap-2">
-        <CardLabel>Registrar gasto</CardLabel>
+        <CardLabel>{titulo}</CardLabel>
         <Badge tone="brand">{form.categoria}</Badge>
       </div>
 
@@ -122,7 +126,7 @@ export function ActionCard({
               onChange={(e) => set("tipo", e.target.value as CrearMovimientoInput["tipo"])}
               className={cn(field, "text-foreground")}
             >
-              {TIPOS_GASTO.map((t) => (
+              {tiposOpts.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>

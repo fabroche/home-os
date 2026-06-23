@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Sparkles } from "lucide-react";
-import { preguntarAsistente, proponerContexto, registrarGasto, consultarJob } from "@/lib/actions/ai";
+import {
+  preguntarAsistente,
+  proponerContexto,
+  registrarGasto,
+  registrarIngreso,
+  registrarDeuda,
+  marcarPagado,
+  consultarJob,
+} from "@/lib/actions/ai";
 import { ChatPanel } from "@/components/asistente/chat-panel";
 import type { ChatMsg } from "@/components/asistente/chat-message";
 
@@ -16,18 +24,46 @@ const STORAGE_KEY = "homeos.chat.v1";
  * `pollMs`/`maxIntentos` inyectables para tests. (Respuesta por polling; Realtime luego.)
  */
 
-/** Heurística MVP de intención (a reemplazar por clasificación del modelo). */
-export function detectarIntencion(texto: string): "preguntar" | "ensenar" | "gasto" {
+export type Intencion = "preguntar" | "ensenar" | "gasto" | "ingreso" | "deuda" | "pagado";
+
+/**
+ * Heurística MVP de intención (a reemplazar por clasificación del modelo). El orden
+ * importa: las acciones se detectan antes que pregunta/enseñar, y se evita confundir
+ * preguntas-insight ("¿en qué gasto más?", "¿a quién le debo más?") con acciones
+ * (exigen imperativo o un importe).
+ */
+export function detectarIntencion(texto: string): Intencion {
   const t = texto.toLowerCase();
-  // Gasto PRIMERO: "regístrame un gasto…" comparte verbo con "enseñar", así que se
-  // prioriza. Requiere un verbo imperativo + "gasto", o un gasto ya hecho (gasté/pagué/
-  // compré). "¿en qué gasto más?" NO matchea (es pregunta, no acción).
+
+  // Marcar pagado: referencia a algo existente + "pagado" (no confundir con "pagué 40").
+  if (/\bpagad[oa]s?\b/.test(t) && /(marca|m[aá]rca|marcar|ya )/.test(t)) return "pagado";
+
+  // Deuda/pago a una persona: préstamo, alta explícita, o deber/deber-importe.
+  if (
+    /\b(prest[eé]|prest[oó]|pr[eé]stamo)(?![a-záéíóúñ])/.test(t) ||
+    /(reg[ií]stra|ap[uú]nta|an[oó]ta).{0,30}\b(deuda|pago)\b/.test(t) ||
+    /\bdeb[oe]\b.{0,25}\d/.test(t)
+  ) {
+    return "deuda";
+  }
+
+  // Ingreso: imperativo + ingreso/salario/nómina, o verbo de cobro con importe.
+  if (
+    /(reg[ií]stra(r|me)?|ap[uú]nta(r|me)?|an[oó]ta(r|me)?|a[ñn]ade|mete).{0,25}\b(ingreso|salario|n[oó]mina)\b/.test(t) ||
+    // sin \b final: en JS \b no marca frontera tras vocal acentuada (cobré, recibí…)
+    /\b(cobr[eé]|recib[ií]|me pagaron|me ingresaron|gan[eé])(?![a-záéíóúñ]).{0,25}\d/.test(t)
+  ) {
+    return "ingreso";
+  }
+
+  // Gasto: imperativo + "gasto", o gasto ya hecho. "¿en qué gasto más?" NO matchea.
   if (
     /(reg[ií]stra(r|me|á)?|an[oó]ta(r|me)?|ap[uú]nta(r|me)?|a[ñn]ade|mete|crea(r|me)?).{0,25}\bgasto\b/.test(t) ||
-    /\b(gast[eé]|pagu[eé]|compr[eé])\b/.test(t)
+    /\b(gast[eé]|pagu[eé]|compr[eé])(?![a-záéíóúñ])/.test(t) // sin \b final por las vocales acentuadas
   ) {
     return "gasto";
   }
+
   if (
     /\b(recu[eé]rdame|an[oó]tame|reg[ií]stra|registr[aá]|guarda(r)? (esto|esta|en (el )?contexto)|crea(r|á)? (una |la )?(regla|nota|preferencia|entrada))\b/.test(
       t,
@@ -133,12 +169,13 @@ export function ChatBubble({
                 })),
               ]);
             }
-          } else if (st.tipo === "registrar_gasto") {
+          } else if (st.tipo === "registrar_gasto" || st.tipo === "registrar_ingreso") {
             const prop = st.propuesta;
+            const cosa = st.tipo === "registrar_ingreso" ? "ingreso" : "gasto";
             actualizar(aMsgId, {
               contenido: prop
-                ? "Te propongo registrar este gasto:"
-                : st.nota || "No pude sacar el gasto. ¿Me dices el importe?",
+                ? `Te propongo registrar este ${cosa}:`
+                : st.nota || `No pude sacar el ${cosa}. ¿Me dices el importe?`,
               pendiente: false,
               jobId: undefined,
             });
@@ -146,6 +183,36 @@ export function ChatBubble({
               setMessages((ms) => [
                 ...ms,
                 { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", propuestaGasto: prop },
+              ]);
+            }
+          } else if (st.tipo === "registrar_deuda") {
+            const prop = st.propuestaDeuda;
+            actualizar(aMsgId, {
+              contenido: prop
+                ? "Te propongo registrar esto:"
+                : st.nota || "No pude sacarlo. ¿Quién y cuánto?",
+              pendiente: false,
+              jobId: undefined,
+            });
+            if (prop) {
+              setMessages((ms) => [
+                ...ms,
+                { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", propuestaDeuda: prop },
+              ]);
+            }
+          } else if (st.tipo === "marcar_pagado") {
+            const mov = st.movimiento;
+            actualizar(aMsgId, {
+              contenido: mov
+                ? "¿Confirmas marcarlo como pagado?"
+                : st.nota || "No tengo claro cuál. ¿Me dices el nombre del gasto?",
+              pendiente: false,
+              jobId: undefined,
+            });
+            if (mov) {
+              setMessages((ms) => [
+                ...ms,
+                { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", movimientoPagar: mov },
               ]);
             }
           } else {
@@ -206,9 +273,15 @@ export function ChatBubble({
     const res =
       intencion === "gasto"
         ? await registrarGasto({ peticion: texto })
-        : intencion === "ensenar"
-          ? await proponerContexto({ peticion: texto })
-          : await preguntarAsistente({ pregunta: texto });
+        : intencion === "ingreso"
+          ? await registrarIngreso({ peticion: texto })
+          : intencion === "deuda"
+            ? await registrarDeuda({ peticion: texto })
+            : intencion === "pagado"
+              ? await marcarPagado({ peticion: texto })
+              : intencion === "ensenar"
+                ? await proponerContexto({ peticion: texto })
+                : await preguntarAsistente({ pregunta: texto });
     if (!res.ok) {
       actualizar(aMsgId, { contenido: res.error, pendiente: false });
       return;
