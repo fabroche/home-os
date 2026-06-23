@@ -43,6 +43,7 @@ const fragmento: FragmentoContexto = {
 };
 const recuperar = async () => [fragmento];
 const listar = async () => [fragmento];
+const finanzas = async () => "Balance global: 100,00 €";
 
 beforeEach(() => {
   tomarSiguienteMock.mockReset();
@@ -61,6 +62,12 @@ describe("construirPrompt", () => {
   it("indica ausencia de contexto cuando no hay fragmentos", () => {
     expect(construirPrompt(job(), [])).toContain("(sin contexto relevante)");
   });
+
+  it("incluye el snapshot financiero en consulta_rag", () => {
+    const p = construirPrompt(job(), [fragmento], "Balance global: 100,00 €");
+    expect(p).toContain("DATOS FINANCIEROS");
+    expect(p).toContain("Balance global: 100,00 €");
+  });
 });
 
 describe("extraerJson", () => {
@@ -74,13 +81,13 @@ describe("extraerJson", () => {
 describe("ejecutarJob", () => {
   it("consulta_rag: valida y devuelve la salida conforme", async () => {
     const invocar = async () => JSON.stringify({ respuesta: "Leo te debe 50€", fuentes: [{ id: "c1", titulo: "Leo" }] });
-    const res = (await ejecutarJob(job(), { invocar, recuperar, listar })) as { respuesta: string };
+    const res = (await ejecutarJob(job(), { invocar, recuperar, listar, finanzas })) as { respuesta: string };
     expect(res.respuesta).toBe("Leo te debe 50€");
   });
 
   it("lanza (reintentable) si la salida no conforma el esquema", async () => {
     const invocar = async () => JSON.stringify({ fuentes: [] }); // falta respuesta
-    await expect(ejecutarJob(job(), { invocar, recuperar, listar })).rejects.toThrow();
+    await expect(ejecutarJob(job(), { invocar, recuperar, listar, finanzas })).rejects.toThrow();
   });
 
   it("proponer_contexto: acepta JSON con fences y borradores", async () => {
@@ -89,7 +96,7 @@ describe("ejecutarJob", () => {
       "```json\n" +
       JSON.stringify({ borradores: [{ tipo: "proveedor", titulo: "Naturgy", contenido: "Compañía de gas", tags: ["gas"] }] }) +
       "\n```";
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar })) as { borradores: unknown[] };
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas })) as { borradores: unknown[] };
     expect(res.borradores).toHaveLength(1);
   });
 });
@@ -107,7 +114,7 @@ describe("drenarCola", () => {
   it("procesa un job y lo cierra como ok", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job()).mockResolvedValueOnce(null);
     const invocar = async () => JSON.stringify({ respuesta: "ok", fuentes: [] });
-    const r = await drenarCola({ invocar, recuperar, listar });
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas });
     expect(r).toMatchObject({ procesados: 1, ok: 1, reintentos: 0, errores: 0 });
     expect(marcarMock).toHaveBeenCalledWith(
       "j1",
@@ -119,7 +126,7 @@ describe("drenarCola", () => {
   it("re-encola (backoff) si falla y quedan intentos", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job({ intentos: 1 })).mockResolvedValueOnce(null);
     const invocar = async () => "{ esto no es json";
-    const r = await drenarCola({ invocar, recuperar, listar }, 3);
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas }, 3);
     expect(r.reintentos).toBe(1);
     expect(reintentarMock).toHaveBeenCalledWith("j1", expect.any(Number), expect.any(String));
     expect(marcarMock).not.toHaveBeenCalled();
@@ -128,7 +135,7 @@ describe("drenarCola", () => {
   it("marca error terminal al agotar los intentos", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job({ intentos: 3 })).mockResolvedValueOnce(null);
     const invocar = async () => "{ esto no es json";
-    const r = await drenarCola({ invocar, recuperar, listar }, 3);
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas }, 3);
     expect(r.errores).toBe(1);
     expect(marcarMock).toHaveBeenCalledWith("j1", "error", expect.objectContaining({ error: expect.any(String) }));
     expect(reintentarMock).not.toHaveBeenCalled();
