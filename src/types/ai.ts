@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TIPOS_CONTEXTO } from "@/types/contexto";
+import { CrearMovimientoInputSchema } from "@/types/finanzas";
 
 /**
  * Tipos de dominio del Asistente IA (M6). La cola `ai_jobs` guarda tareas tipadas
@@ -16,6 +17,7 @@ export const AI_JOB_TIPOS = [
   "resumen_semana",
   "consulta_rag",
   "proponer_contexto",
+  "registrar_gasto",
 ] as const;
 export type AiJobTipo = (typeof AI_JOB_TIPOS)[number];
 
@@ -33,6 +35,11 @@ export const ProponerContextoPayloadSchema = z.object({
 });
 export type ProponerContextoPayload = z.infer<typeof ProponerContextoPayloadSchema>;
 
+export const RegistrarGastoPayloadSchema = z.object({
+  peticion: z.string().trim().min(1, "La petición es obligatoria").max(2000),
+});
+export type RegistrarGastoPayload = z.infer<typeof RegistrarGastoPayloadSchema>;
+
 /**
  * Registro de esquemas de payload por tipo. Solo se pueden encolar tipos con
  * esquema (evita meter payloads sin validar). Los demás tipos se añaden cuando se
@@ -41,6 +48,7 @@ export type ProponerContextoPayload = z.infer<typeof ProponerContextoPayloadSche
 export const JOB_PAYLOAD_SCHEMAS = {
   consulta_rag: ConsultaRagPayloadSchema,
   proponer_contexto: ProponerContextoPayloadSchema,
+  registrar_gasto: RegistrarGastoPayloadSchema,
 } satisfies Partial<Record<AiJobTipo, z.ZodTypeAny>>;
 
 export type TipoEncolable = keyof typeof JOB_PAYLOAD_SCHEMAS;
@@ -66,9 +74,22 @@ export const ProponerContextoOutputSchema = z.object({
 });
 export type ProponerContextoOutput = z.infer<typeof ProponerContextoOutputSchema>;
 
+/**
+ * Salida de `registrar_gasto`: la IA **propone** un movimiento (validado con el MISMO
+ * esquema con el que se crea, así la propuesta es directamente confirmable) o devuelve
+ * `propuesta: null` con una `nota` si le falta info. La IA NO ejecuta: solo propone;
+ * la escritura ocurre cuando el usuario confirma (gobernanza "propone → aprueba → crea").
+ */
+export const RegistrarGastoOutputSchema = z.object({
+  propuesta: CrearMovimientoInputSchema.nullable(),
+  nota: z.string().trim().max(500).optional(),
+});
+export type RegistrarGastoOutput = z.infer<typeof RegistrarGastoOutputSchema>;
+
 export const JOB_OUTPUT_SCHEMAS = {
   consulta_rag: ConsultaRagOutputSchema,
   proponer_contexto: ProponerContextoOutputSchema,
+  registrar_gasto: RegistrarGastoOutputSchema,
 } satisfies Partial<Record<AiJobTipo, z.ZodTypeAny>>;
 
 /** DTO de dominio de un job (mapea la fila de `ai_jobs`). */

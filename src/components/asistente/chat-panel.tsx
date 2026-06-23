@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { X, Send, Sparkles } from "lucide-react";
 import { ChatMessage, type ChatMsg } from "@/components/asistente/chat-message";
 import { SuggestionCard } from "@/components/asistente/suggestion-card";
+import { ActionCard } from "@/components/asistente/action-card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -70,12 +71,15 @@ export function ChatPanel({
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Preguntá sobre tus finanzas o pedime guardar una regla en tu banco de contexto.
+            Preguntá sobre tus finanzas (en qué gastás más, a quién le debés más…), pedime registrar un
+            gasto o guardar una regla en tu banco de contexto.
           </p>
         ) : (
           messages.map((m) =>
             m.borrador ? (
               <SuggestionCard key={m.id} borrador={m.borrador} />
+            ) : m.propuestaGasto ? (
+              <ActionCard key={m.id} propuesta={m.propuestaGasto} />
             ) : (
               <ChatMessage key={m.id} msg={m} />
             ),

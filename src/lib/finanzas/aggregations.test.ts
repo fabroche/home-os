@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resumen, gastosPorCategoria, porMes, resumenDeudas } from "./aggregations";
+import { resumen, gastosPorCategoria, ingresosPorCategoria, porMes, resumenDeudas } from "./aggregations";
 import type { Movimiento, Deuda } from "@/types/finanzas";
 
 function mov(flujo: Movimiento["flujo"], importe: number | null): Movimiento {
@@ -57,6 +57,22 @@ describe("gastosPorCategoria", () => {
     expect(r[1]).toEqual({ categoria: "Comida", total: 50 });
     expect(r.find((x) => x.categoria === "Sin categoría")?.total).toBe(10);
     expect(r.some((x) => x.categoria === "Salario")).toBe(false);
+  });
+});
+
+describe("ingresosPorCategoria", () => {
+  it("agrupa ingresos por categoría/fuente (magnitud) y ordena desc; ignora gastos", () => {
+    const r = ingresosPorCategoria([
+      movCF("ingreso", 1500, "Salario", "2026-06-01"),
+      movCF("ingreso", 300, "Desarrollo", "2026-06-05"),
+      movCF("ingreso", 200, "Salario", "2026-06-15"),
+      movCF("gasto", -70, "Casa", "2026-06-01"),
+      movCF("ingreso", 40, null, "2026-06-01"),
+    ]);
+    expect(r[0]).toEqual({ categoria: "Salario", total: 1700 });
+    expect(r[1]).toEqual({ categoria: "Desarrollo", total: 300 });
+    expect(r.find((x) => x.categoria === "Sin categoría")?.total).toBe(40);
+    expect(r.some((x) => x.categoria === "Casa")).toBe(false);
   });
 });
 

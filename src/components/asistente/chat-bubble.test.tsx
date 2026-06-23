@@ -5,20 +5,24 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 
 const preguntar = vi.fn();
 const proponer = vi.fn();
+const registrar = vi.fn();
 const consultar = vi.fn();
 vi.mock("@/lib/actions/ai", () => ({
   preguntarAsistente: (...a: unknown[]) => preguntar(...a),
   proponerContexto: (...a: unknown[]) => proponer(...a),
+  registrarGasto: (...a: unknown[]) => registrar(...a),
   consultarJob: (...a: unknown[]) => consultar(...a),
 }));
-// SuggestionCard (vía ChatPanel) importa esta Server Action.
+// SuggestionCard / ActionCard (vía ChatPanel) importan estas Server Actions.
 vi.mock("@/lib/actions/contexto", () => ({ guardarEntrada: vi.fn() }));
+vi.mock("@/lib/actions/finanzas", () => ({ crearMovimiento: vi.fn() }));
 
 import { ChatBubble } from "@/components/asistente/chat-bubble";
 
 beforeEach(() => {
   preguntar.mockReset();
   proponer.mockReset();
+  registrar.mockReset();
   consultar.mockReset();
   sessionStorage.clear();
 });
@@ -69,6 +73,33 @@ describe("ChatBubble", () => {
     await waitFor(() => expect(screen.getByText(/sugerencia de contexto/i)).toBeInTheDocument());
     expect(screen.getByText("Naturgy")).toBeInTheDocument();
     expect(proponer).toHaveBeenCalled();
+    expect(preguntar).not.toHaveBeenCalled();
+  });
+
+  it("intención de gasto: propone y muestra la tarjeta de acción", async () => {
+    registrar.mockResolvedValue({ ok: true, jobId: "jg" });
+    consultar.mockResolvedValue({
+      estado: "ok",
+      tipo: "registrar_gasto",
+      propuesta: {
+        nombre: "Café",
+        importe: 2.5,
+        categoria: "Restaurantes",
+        tipo: "Gasto Variable",
+        fecha: "2026-06-23",
+        estado: "Pending",
+      },
+    });
+
+    render(<ChatBubble defaultOpen pollMs={5} />);
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
+      target: { value: "apúntame un gasto de 2,5€ en café" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => expect(screen.getByText(/registrar gasto/i)).toBeInTheDocument());
+    expect(screen.getByDisplayValue("Café")).toBeInTheDocument();
+    expect(registrar).toHaveBeenCalledWith({ peticion: "apúntame un gasto de 2,5€ en café" });
     expect(preguntar).not.toHaveBeenCalled();
   });
 

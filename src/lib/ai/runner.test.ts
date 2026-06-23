@@ -68,6 +68,15 @@ describe("construirPrompt", () => {
     expect(p).toContain("DATOS FINANCIEROS");
     expect(p).toContain("Balance global: 100,00 €");
   });
+
+  it("registrar_gasto: incluye la petición, las categorías válidas y la fecha de hoy", () => {
+    const j = job({ tipo: "registrar_gasto", payload: { peticion: "gasté 40 en comida" } });
+    const p = construirPrompt(j, [], "2026-06-23");
+    expect(p).toContain("gasté 40 en comida");
+    expect(p).toContain("Comida"); // una de las CATEGORIAS
+    expect(p).toContain("2026-06-23"); // fecha de hoy
+    expect(p).toMatch(/propuesta/);
+  });
 });
 
 describe("extraerJson", () => {
@@ -88,6 +97,30 @@ describe("ejecutarJob", () => {
   it("lanza (reintentable) si la salida no conforma el esquema", async () => {
     const invocar = async () => JSON.stringify({ fuentes: [] }); // falta respuesta
     await expect(ejecutarJob(job(), { invocar, recuperar, listar, finanzas })).rejects.toThrow();
+  });
+
+  it("registrar_gasto: valida y devuelve la propuesta de gasto", async () => {
+    const j = job({ tipo: "registrar_gasto", payload: { peticion: "gasté 40 en comida hoy" } });
+    const invocar = async () =>
+      JSON.stringify({
+        propuesta: { nombre: "Comida", importe: 40, categoria: "Comida", tipo: "Gasto Variable", fecha: "2026-06-23", estado: "Pending" },
+        nota: "",
+      });
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas })) as {
+      propuesta: { importe: number } | null;
+    };
+    expect(res.propuesta?.importe).toBe(40);
+  });
+
+  it("registrar_gasto: acepta propuesta null con nota cuando falta info", async () => {
+    const j = job({ tipo: "registrar_gasto", payload: { peticion: "registra un gasto en comida" } });
+    const invocar = async () => JSON.stringify({ propuesta: null, nota: "¿De cuánto fue el gasto?" });
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas })) as {
+      propuesta: null;
+      nota: string;
+    };
+    expect(res.propuesta).toBeNull();
+    expect(res.nota).toMatch(/cuánto/i);
   });
 
   it("proponer_contexto: acepta JSON con fences y borradores", async () => {

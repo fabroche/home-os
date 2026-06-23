@@ -4,8 +4,15 @@ import { env } from "@/config/env";
 import { recuperarContexto, listarContexto } from "@/lib/ai/context/retrieve";
 import { tomarSiguiente, marcar, reintentar } from "@/lib/ai/jobs";
 import { listMovimientos, listDeudas } from "@/lib/services/finanzas";
-import { resumen, resumenDeudas, porMes } from "@/lib/finanzas/aggregations";
+import {
+  resumen,
+  resumenDeudas,
+  porMes,
+  gastosPorCategoria,
+  ingresosPorCategoria,
+} from "@/lib/finanzas/aggregations";
 import { JOB_OUTPUT_SCHEMAS, type AiJob } from "@/types/ai";
+import { CATEGORIAS, TIPOS } from "@/types/finanzas";
 import type { FragmentoContexto } from "@/types/contexto";
 
 /**
@@ -20,7 +27,7 @@ import type { FragmentoContexto } from "@/types/contexto";
 function textoEntrada(job: AiJob): string {
   const p = (job.payload ?? {}) as Record<string, unknown>;
   if (job.tipo === "consulta_rag") return String(p.pregunta ?? "");
-  if (job.tipo === "proponer_contexto") return String(p.peticion ?? "");
+  if (job.tipo === "proponer_contexto" || job.tipo === "registrar_gasto") return String(p.peticion ?? "");
   return "";
 }
 
@@ -35,6 +42,9 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
     return [
       "Eres el asistente de home-os (gestión personal). Responde en español, conciso.",
       "Usa los DATOS FINANCIEROS y el CONTEXTO de abajo para responder. Si no alcanzan, dilo.",
+      "Da insights con CIFRAS EXACTAS de los DATOS: si preguntan en qué gasta más, a quién",
+      "debe más o cuál es su ingreso principal, nombra la categoría/persona concreta y su importe.",
+      "No inventes números que no estén en los DATOS.",
       "Devuelve EXCLUSIVAMENTE un JSON válido con esta forma, sin texto extra ni markdown:",
       '{ "respuesta": string, "fuentes": [ { "id": string, "titulo": string } ] }',
       "En `fuentes` cita solo los fragmentos de CONTEXTO que usaste (su id y título).",
@@ -46,6 +56,26 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       contexto,
       "",
       "=== PREGUNTA ===",
+      entrada,
+    ].join("\n");
+  }
+
+  if (job.tipo === "registrar_gasto") {
+    const tiposGasto = TIPOS.filter((t) => t.startsWith("Gasto"));
+    const hoy = datos ?? "";
+    return [
+      "Eres el asistente de home-os. El usuario quiere registrar un GASTO a partir de su PETICIÓN.",
+      "Extrae los campos y PROPÓN el movimiento (no lo ejecutas tú; el usuario lo confirmará).",
+      `Hoy es ${hoy}. Si no indica fecha, usa la de hoy (formato YYYY-MM-DD).`,
+      `categoria DEBE ser una de: ${CATEGORIAS.join(", ")}.`,
+      `tipo DEBE ser uno de: ${tiposGasto.join(", ")} (elige el más razonable; por defecto "Gasto Variable").`,
+      "importe = número positivo en euros (la magnitud del gasto). estado = \"Pending\".",
+      "nombre = una descripción corta del gasto.",
+      "Si NO puedes deducir el importe, devuelve propuesta: null y explica qué falta en `nota`.",
+      "Devuelve EXCLUSIVAMENTE un JSON válido, sin markdown, con esta forma:",
+      '{ "propuesta": { "nombre": string, "importe": number, "categoria": string, "tipo": string, "fecha": "YYYY-MM-DD", "estado": "Pending" } | null, "nota": string }',
+      "",
+      "=== PETICIÓN ===",
       entrada,
     ].join("\n");
   }
@@ -100,22 +130,43 @@ function invocarClaude(prompt: string): Promise<string> {
   });
 }
 
-/** Snapshot compacto de finanzas (single-user) para que el asistente responda con cifras. */
+/**
+ * Snapshot compacto de finanzas (single-user) para que el asistente responda con
+ * cifras DURAS: totales, desglose por categoría (gasto e ingreso) y deuda neta por
+ * persona. Es la base de los insights ("en qué gasto más", "a quién debo más",
+ * "cuál es mi ingreso principal").
+ */
 async function snapshotFinanzas(): Promise<string> {
   const [movs, deudas] = await Promise.all([listMovimientos(), listDeudas()]);
   const r = resumen(movs);
   const rd = resumenDeudas(deudas);
   const meses = porMes(movs).slice(0, 3);
+  const gastosCat = gastosPorCategoria(movs).slice(0, 6);
+  const ingresosCat = ingresosPorCategoria(movs).slice(0, 5);
   const eur = (n: number) => `${n.toFixed(2)} €`;
+  const cats = (xs: { categoria: string; total: number }[]) =>
+    xs.map((c) => `${c.categoria} ${eur(c.total)}`).join(" · ");
+  const pers = (xs: { persona: string; total: number }[]) =>
+    xs.map((p) => `${p.persona} ${eur(p.total)}`).join(" · ");
+
   const lineas = [
     `Balance global: ${eur(r.balance)}`,
-    `Ingresos totales: ${eur(r.ingresos)} · Gastos totales: ${eur(r.gastos)}`,
-    `Deudas: por pagar ${eur(rd.total)} · por cobrar ${eur(rd.totalPorCobrar)}`,
-    `Movimientos registrados: ${r.total}`,
+    `Ingresos totales: ${eur(r.ingresos)} · Gastos totales: ${eur(r.gastos)} · Movimientos: ${r.total}`,
   ];
+  if (gastosCat.length) lineas.push(`Gasto por categoría (mayor→menor): ${cats(gastosCat)}`);
+  if (ingresosCat.length) lineas.push(`Ingreso por categoría/fuente (mayor→menor): ${cats(ingresosCat)}`);
+  lineas.push(
+    rd.porPersona.length
+      ? `Le debes (por pagar, mayor→menor): ${pers(rd.porPersona)}`
+      : "No tienes deudas pendientes de pago.",
+  );
+  if (rd.porCobrar.length) lineas.push(`Te deben (por cobrar): ${pers(rd.porCobrar)}`);
+  lineas.push(`Total deuda: por pagar ${eur(rd.total)} · por cobrar ${eur(rd.totalPorCobrar)}`);
   if (meses.length) {
     lineas.push(
-      `Últimos meses (balance): ${meses.map((m) => `${m.mes}: ${eur(m.balance)}`).join(" · ")}`,
+      `Últimos meses (ingresos/gastos/balance): ${meses
+        .map((m) => `${m.mes}: +${eur(m.ingresos)} / -${eur(m.gastos)} = ${eur(m.balance)}`)
+        .join(" · ")}`,
     );
   }
   return lineas.join("\n");
@@ -147,8 +198,15 @@ export async function ejecutarJob(job: AiJob, deps: RunnerDeps = defaultDeps): P
   const fragmentos =
     job.tipo === "proponer_contexto"
       ? await deps.listar(job.userId)
-      : await deps.recuperar(job.userId, { consulta: textoEntrada(job), k: 8 });
-  const datos = job.tipo === "consulta_rag" ? await deps.finanzas() : undefined;
+      : job.tipo === "consulta_rag"
+        ? await deps.recuperar(job.userId, { consulta: textoEntrada(job), k: 8 })
+        : []; // registrar_gasto no necesita contexto del banco
+  const datos =
+    job.tipo === "consulta_rag"
+      ? await deps.finanzas()
+      : job.tipo === "registrar_gasto"
+        ? new Date().toISOString().slice(0, 10) // fecha de hoy para el prompt
+        : undefined;
   const prompt = construirPrompt(job, fragmentos, datos);
   const raw = await deps.invocar(prompt);
   return schema.parse(extraerJson(raw)); // ZodError ⇒ el job se marca error (reintentable)

@@ -3,6 +3,8 @@
  * capa server/worker, que no debe ejecutarse en el navegador).
  */
 export const preguntarAsistente = async () => ({ ok: true as const, jobId: "sb-job" });
+export const proponerContexto = async () => ({ ok: true as const, jobId: "sb-job" });
+export const registrarGasto = async () => ({ ok: true as const, jobId: "sb-job" });
 
 export const consultarJob = async () => ({
   estado: "ok" as const,
