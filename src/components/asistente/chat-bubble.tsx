@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Sparkles } from "lucide-react";
 import { preguntarAsistente, proponerContexto, consultarJob } from "@/lib/actions/ai";
@@ -32,7 +32,7 @@ export function detectarIntencion(texto: string): "preguntar" | "ensenar" {
 export function ChatBubble({
   defaultOpen = false,
   pollMs = 1500,
-  maxIntentos = 40,
+  maxIntentos = 200,
 }: {
   defaultOpen?: boolean;
   pollMs?: number;
@@ -40,14 +40,25 @@ export function ChatBubble({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [pending, setPending] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const primeraPersistencia = useRef(true);
+  // Timers de polling en curso, indexados por jobId (uno por consulta). Al terminar
+  // (ok/error/tope) se borra la entrada, lo que permite reanudar al reabrir/recargar.
+  const activos = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+  // El input se bloquea mientras haya alguna consulta pendiente (derivado, no estado).
+  const pending = messages.some((m) => m.pendiente);
+
+  useEffect(() => {
+    const map = activos.current;
+    return () => {
+      map.forEach(clearTimeout);
+      map.clear();
+    };
+  }, []);
 
   // Hidrata el historial desde sessionStorage (sobrevive a navegación/cierre/recarga
-  // dentro de la pestaña). Una consulta a medias (pendiente) se cierra al restaurar.
+  // dentro de la pestaña). Un pendiente CON jobId se reanuda (el worker pudo terminar
+  // mientras tanto); uno SIN jobId (nunca se llegó a encolar) se marca interrumpido.
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -56,7 +67,9 @@ export function ChatBubble({
         // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación en montaje
         setMessages(
           guardado.map((m) =>
-            m.pendiente ? { ...m, pendiente: false, contenido: m.contenido || "(consulta interrumpida)" } : m,
+            m.pendiente && !m.jobId
+              ? { ...m, pendiente: false, contenido: m.contenido || "(consulta interrumpida)" }
+              : m,
           ),
         );
       }
@@ -78,9 +91,83 @@ export function ChatBubble({
     }
   }, [messages]);
 
-  function actualizar(id: string, patch: Partial<ChatMsg>) {
+  const actualizar = useCallback((id: string, patch: Partial<ChatMsg>) => {
     setMessages((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)));
-  }
+  }, []);
+
+  // Sondea un job hasta que cierre (ok/error) o se agote la ventana. Idempotente por
+  // jobId vía `activos`: si el tope se alcanza sin respuesta, deja el mensaje pendiente
+  // para reanudarlo al reabrir (el resultado ya calculado sigue guardado en `ai_jobs`).
+  const pollJob = useCallback(
+    (aMsgId: string, jobId: string) => {
+      let intentos = 0;
+      const tick = async () => {
+        intentos++;
+        const st = await consultarJob(jobId);
+        if (st.estado === "ok") {
+          if (st.tipo === "proponer_contexto") {
+            actualizar(aMsgId, {
+              contenido: st.borradores.length
+                ? "Te propongo guardar esto:"
+                : "No encontré nada nuevo para registrar.",
+              pendiente: false,
+              jobId: undefined,
+            });
+            if (st.borradores.length) {
+              setMessages((ms) => [
+                ...ms,
+                ...st.borradores.map((b) => ({
+                  id: crypto.randomUUID(),
+                  rol: "assistant" as const,
+                  contenido: "",
+                  borrador: b,
+                })),
+              ]);
+            }
+          } else {
+            actualizar(aMsgId, {
+              contenido: st.respuesta,
+              fuentes: st.fuentes,
+              pendiente: false,
+              jobId: undefined,
+            });
+          }
+          activos.current.delete(jobId);
+          return;
+        }
+        if (st.estado === "error") {
+          actualizar(aMsgId, {
+            contenido: `No pude responder: ${st.error}`,
+            pendiente: false,
+            jobId: undefined,
+          });
+          activos.current.delete(jobId);
+          return;
+        }
+        if (intentos >= maxIntentos) {
+          // No se descarta: queda pendiente con su jobId y se reanudará al reabrir.
+          activos.current.delete(jobId);
+          return;
+        }
+        const t = setTimeout(tick, pollMs); // pendiente/ejecutando/desconocido → seguir
+        activos.current.set(jobId, t);
+      };
+      const t = setTimeout(tick, pollMs);
+      activos.current.set(jobId, t);
+    },
+    [actualizar, maxIntentos, pollMs],
+  );
+
+  // Arranca/reanuda el polling de cualquier mensaje pendiente que tenga jobId y no esté
+  // ya sondeándose. Cubre el flujo normal (onSend asigna el jobId) y la reanudación al
+  // reabrir el panel (`open`) o tras rehidratar el historial.
+  useEffect(() => {
+    for (const m of messages) {
+      if (m.pendiente && m.jobId && !activos.current.has(m.jobId)) {
+        pollJob(m.id, m.jobId);
+      }
+    }
+  }, [messages, open, pollJob]);
 
   async function onSend(texto: string) {
     const intencion = detectarIntencion(texto);
@@ -91,7 +178,6 @@ export function ChatBubble({
       { id: userMsgId, rol: "user", contenido: texto },
       { id: aMsgId, rol: "assistant", contenido: "", pendiente: true },
     ]);
-    setPending(true);
 
     const res =
       intencion === "ensenar"
@@ -99,52 +185,11 @@ export function ChatBubble({
         : await preguntarAsistente({ pregunta: texto });
     if (!res.ok) {
       actualizar(aMsgId, { contenido: res.error, pendiente: false });
-      setPending(false);
       return;
     }
-
-    let intentos = 0;
-    const poll = async () => {
-      intentos++;
-      const st = await consultarJob(res.jobId);
-      if (st.estado === "ok") {
-        if (st.tipo === "proponer_contexto") {
-          actualizar(aMsgId, {
-            contenido: st.borradores.length
-              ? "Te propongo guardar esto:"
-              : "No encontré nada nuevo para registrar.",
-            pendiente: false,
-          });
-          if (st.borradores.length) {
-            setMessages((ms) => [
-              ...ms,
-              ...st.borradores.map((b) => ({
-                id: crypto.randomUUID(),
-                rol: "assistant" as const,
-                contenido: "",
-                borrador: b,
-              })),
-            ]);
-          }
-        } else {
-          actualizar(aMsgId, { contenido: st.respuesta, fuentes: st.fuentes, pendiente: false });
-        }
-        setPending(false);
-        return;
-      }
-      if (st.estado === "error") {
-        actualizar(aMsgId, { contenido: `No pude responder: ${st.error}`, pendiente: false });
-        setPending(false);
-        return;
-      }
-      if (intentos >= maxIntentos) {
-        actualizar(aMsgId, { contenido: "El asistente tardó demasiado. Probá de nuevo.", pendiente: false });
-        setPending(false);
-        return;
-      }
-      timer.current = setTimeout(poll, pollMs); // pendiente/ejecutando/desconocido → seguir
-    };
-    timer.current = setTimeout(poll, pollMs);
+    // Guarda el jobId en el mensaje: el efecto de arriba arranca el polling y, si la
+    // pestaña se recarga, lo reanuda en vez de perder la respuesta del worker.
+    actualizar(aMsgId, { jobId: res.jobId });
   }
 
   return (
