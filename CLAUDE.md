@@ -88,7 +88,9 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
 - **M6 · Asistente IA (MVP)**: cola `ai_jobs` (claim atómico `tomar_ai_job` con SKIP LOCKED) + **runner
   headless** (`claude -p --output-format json`, contexto M4 + **snapshot financiero**, **salida validada con
   Zod**, reintentos con backoff). **Burbuja de chat** (FAB + sheet móvil/tarjeta desktop, polling,
-  **historial en sessionStorage**, animaciones motion) sobre `consulta_rag`, y **proponer contexto**
+  **historial en sessionStorage**, animaciones motion — el panel **crece/se recoge desde el FAB** y el
+  **polling persiste el `jobId` y se reanuda** al reabrir/recargar, así no se pierde la respuesta de un
+  job lento) sobre `consulta_rag`, y **proponer contexto**
   (`proponer_contexto` → `SuggestionCard` con Revisar y publicar / Guardar borrador / Descartar).
   **Gobernanza M4↔M6:** decide solo con publicado, escribe solo borradores, publicar = usuario.
   Migraciones `0005`/`0006`. Auth runner por `CLAUDE_CODE_OAUTH_TOKEN` (CLI fijado en la imagen del worker).

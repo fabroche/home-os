@@ -133,5 +133,8 @@ borrador). **Publicar es acción del usuario** (`cambiarEstado`). Flujo de la su
   atado a la cuenta Anthropic). **Plan B:** `ANTHROPIC_API_KEY` (sin expiración, pago por token) —
   enchufable cambiando solo el runner (RF-M6-007).
 - **Entrega de respuesta:** **polling corto** en el MVP; Supabase Realtime como mejora.
+  El `jobId` se **persiste en el mensaje** y el polling se **reanuda** al reabrir el panel o recargar
+  la pestaña: como el runner headless puede tardar >60s, así no se huérfana la respuesta que el worker
+  ya dejó en `ai_jobs` (ventana de polling ~5 min; al agotarse, el mensaje queda pendiente para retomarse).
 - Definir formato exacto de invocación de Claude Code (flags, `--output-format json`, system prompt, skills disponibles para el agente).
 - Concurrencia del runner (cuántos jobs en paralelo sin saturar).
