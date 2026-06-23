@@ -7,15 +7,30 @@
 | **Depende de** | M4 (contexto), M7, Supabase, Claude Code headless |
 | **Lo usan** | M1 (conciliación), M2 (scoring/resúmenes), M3 (clasificación/extracción) |
 
-> **Estado de implementación (2026-06-23).** Hecho: cola `ai_jobs` (claim atómico), runner headless
+> **Estado de implementación (2026-06-24).** Hecho: cola `ai_jobs` (claim atómico), runner headless
 > (contexto M4 + **snapshot financiero** + validación Zod + reintentos/backoff), burbuja de chat
-> (`consulta_rag`, polling, **historial en sessionStorage**, **animaciones** motion), proponer contexto
+> (polling, **historial en sessionStorage**, **animaciones** motion), proponer contexto
 > (`proponer_contexto` + `SuggestionCard`), gobernanza M4↔M6. Migraciones `0005`/`0006`. CLI `claude` fijado
 > en `worker.Dockerfile` (`@anthropic-ai/claude-code@2.1.186`); auth por `CLAUDE_CODE_OAUTH_TOKEN`.
+>
+> **Insights + tool calling (PR #28/#29 en prod).** El snapshot financiero está **enriquecido** (gasto e
+> ingreso por categoría + deuda neta por persona): responde "en qué gasto más / a quién debo más / cuál es
+> mi ingreso principal" con cifras duras. **Acciones** (la IA **propone**, el usuario **confirma**, nunca
+> ejecuta): `registrar_gasto`/`registrar_ingreso` (`ActionCard`→`crearMovimiento`), `registrar_deuda`
+> (`DeudaCard`→`crearDeuda`), `marcar_pagado` (`MarcarPagadoCard`→`cambiarEstadoMovimiento`; el runner le
+> pasa la lista de gastos PENDIENTES con su `notionPageId` y la IA elige).
+>
+> **Router de intención (PR #30 en prod).** Tipo de job único `asistente`: el modelo **clasifica la
+> intención en una sola pasada** y produce la propuesta, o devuelve `accion:"aclarar"` con opciones
+> **cuando el mensaje admite más de una lectura** (ej. "ya pagué la luz" = ¿gasto nuevo o marcar pagado?).
+> Sustituye la heurística de regex del cliente (eliminada). Elegir una opción reenvía el mensaje **forzando**
+> esa acción (reusa los flujos dedicados). Salida = unión discriminada por `accion` (`AsistenteOutputSchema`)
+> mapeada a los mismos estados que ya pintan las tarjetas + `aclarar`. Opciones tipadas con `z.enum`
+> (acción inválida → la rechaza Zod). Sin migración (el tipo es texto en `ai_jobs`).
+>
 > **Pendiente (Fase 5):** rotación de token desde la app (cifrada) + banner de estado (RF-M6-013);
-> observabilidad de jobs en el dashboard (RF-M6-006, parte UI). Mejoras: "Revisar y publicar" abriendo el
-> editor M4 precargado; intención preguntar/enseñar por clasificación del modelo (hoy heurística); el
-> snapshot financiero es single-user y resumido (no consultas finas tipo tool-use).
+> observabilidad de jobs en el dashboard (RF-M6-006, parte UI); selector de modelo Sonnet/Opus + worker en
+> Sonnet por defecto (cuota); el snapshot financiero es single-user y resumido (no consultas finas tipo tool-use).
 
 ## 1. Propósito y alcance
 Capa de IA **agnóstica al motor**: la app encola tareas en `AI_JOB`; el **worker** las ejecuta con
@@ -50,6 +65,9 @@ App web (encola); Worker/Runner (ejecuta); Claude Code headless (motor).
 | RF-M6-011 | Cada sugerencia ofrece **Revisar y publicar** / **Guardar como borrador** / **Descartar**. | Must |
 | RF-M6-012 | Auth del runner por **`CLAUDE_CODE_OAUTH_TOKEN`** (`claude setup-token`, ~1 año, suscripción). | Must |
 | RF-M6-013 | **Rotación de token desde la app**: campo admin que guarda el token **cifrado** (lo lee el runner) + **banner de estado** del asistente si falla la auth. | Should |
+| RF-M6-014 | **Insights financieros**: responder con cifras duras del snapshot (gasto/ingreso por categoría, deuda por persona). | Must |
+| RF-M6-015 | **Acciones (tool calling) con confirmación**: registrar gasto/ingreso, deuda/pago y marcar pagado; la IA **propone** (mismo Zod del alta manual), el usuario **confirma** (Server Action auth). | Must |
+| RF-M6-016 | **Router de intención por modelo**: un job `asistente` clasifica la intención y propone; **desambigua** (`accion:"aclarar"` con opciones) cuando hay >1 lectura. Sustituye la heurística de regex. | Must |
 
 ## 4. Requisitos no funcionales (RNF)
 | ID | Requisito | Métrica |
@@ -91,6 +109,14 @@ sequenceDiagram
   `consulta_rag`; la respuesta llega por **polling corto** en el MVP (Realtime como mejora futura)).
 - **F-M6-6 · Sugerir/crear contexto** (tarea `proponer_contexto`; **tarjeta de sugerencia** con
   *Revisar y publicar* / *Guardar como borrador* / *Descartar*; la IA escribe **solo borradores**).
+- **F-M6-7 · Acciones con confirmación (tool calling)** — `registrar_gasto`/`registrar_ingreso`/
+  `registrar_deuda`/`marcar_pagado`. Patrón **"propone → aprueba → crea"**: la IA propone (validado con el
+  MISMO esquema del alta manual), el usuario revisa/edita/confirma en una **tarjeta** y la escritura ocurre
+  vía Server Action autenticada (Notion). La IA **nunca** ejecuta. Whitelist cerrada → resistente a injection.
+- **F-M6-8 · Router de intención** — job único `asistente`: el modelo clasifica la intención en una pasada
+  (responder/gasto/ingreso/deuda/pagado/contexto) o **pide aclarar** con opciones tipadas cuando el mensaje
+  es ambiguo. Elegir una opción reenvía el mensaje **forzando** la acción (reusa F-M6-7). Reemplaza la
+  heurística de regex del cliente.
 
 ## 8. Contratos de tarea (resumen)
 | Tipo | Entrada | Salida |
@@ -102,6 +128,10 @@ sequenceDiagram
 | `resumen_semana` | eventos de la ventana | texto resumen |
 | `consulta_rag` | pregunta + contexto (M4, **solo publicado**) | respuesta + fuentes |
 | `proponer_contexto` | petición/observación + contexto actual | borrador(es) de `EntradaContexto` (tipo, título, contenido, tags, vigencia) |
+| `registrar_gasto` / `registrar_ingreso` | petición + fecha de hoy | `propuesta` de movimiento (Zod del alta) \| `null` + `nota` |
+| `registrar_deuda` | petición + fecha de hoy | `propuesta` de deuda/pago (persona, valor, movimiento) \| `null` + `nota` |
+| `marcar_pagado` | petición + lista de gastos PENDIENTES (con `notionPageId`) | `movimiento` elegido (id, nombre, importe) \| `null` + `nota` |
+| `asistente` (router) | mensaje + snapshot + pendientes + contexto | **unión discriminada por `accion`**: responder \| gasto \| ingreso \| deuda \| pagado \| contexto \| **aclarar** (pregunta + opciones) |
 
 ## 8.1 Banco de contexto (M4): gobernanza del asistente
 Dos rutas de lectura **separadas** para que los borradores nunca dirijan decisiones:

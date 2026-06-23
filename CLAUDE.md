@@ -64,7 +64,7 @@ La app encola tareas en `ai_jobs` (Supabase) y el `worker` las drena con el runn
 | M6 | Asistente IA (jobs headless) |
 | M7 | Auth & seguridad (single-user) |
 
-## Estado actual (2026-06-23) — EN PRODUCCIÓN
+## Estado actual (2026-06-24) — EN PRODUCCIÓN
 Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **worker** (sync 24/7) +
 **Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 183 tests verdes.
 
@@ -85,17 +85,26 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
 - **M4 · Banco de contexto**: CRUD de entradas tipadas (tags + vigencia + estado) y recuperación selectiva
   por tipo/tag/vigencia + FTS Postgres (sin embeddings, D7). Migración `0002_contexto.sql` **aplicada**
   (incluye la función SQL `recuperar_contexto`). UI en `/contexto`.
-- **M6 · Asistente IA (MVP)**: cola `ai_jobs` (claim atómico `tomar_ai_job` con SKIP LOCKED) + **runner
+- **M6 · Asistente IA**: cola `ai_jobs` (claim atómico `tomar_ai_job` con SKIP LOCKED) + **runner
   headless** (`claude -p --output-format json`, contexto M4 + **snapshot financiero**, **salida validada con
   Zod**, reintentos con backoff). **Burbuja de chat** (FAB + sheet móvil/tarjeta desktop, polling,
   **historial en sessionStorage**, animaciones motion — el panel **crece/se recoge desde el FAB** y el
   **polling persiste el `jobId` y se reanuda** al reabrir/recargar, así no se pierde la respuesta de un
-  job lento) sobre `consulta_rag`, y **proponer contexto**
-  (`proponer_contexto` → `SuggestionCard` con Revisar y publicar / Guardar borrador / Descartar).
+  job lento), **proponer contexto**
+  (`proponer_contexto` → `SuggestionCard` con Revisar y publicar / Guardar borrador / Descartar), **insights
+  financieros** (snapshot enriquecido: gasto/ingreso por categoría + deuda por persona; responde "en qué
+  gasto más / a quién debo más / ingreso principal" con cifras) y **acciones con confirmación (tool calling)**:
+  registrar gasto/ingreso, deuda/pago y marcar pagado — la IA **propone** (mismo Zod del alta manual), el
+  usuario **confirma** en una tarjeta y la escritura va por Server Action autenticada; la IA **nunca** ejecuta.
+  **Router de intención** (job único `asistente`): el modelo clasifica la intención en una pasada y **desambigua**
+  (`accion:"aclarar"` con opciones tipadas) cuando el mensaje admite >1 lectura (ej. "ya pagué la luz");
+  sustituye la heurística de regex (eliminada). PRs #28/#29/#30 en prod.
   **Gobernanza M4↔M6:** decide solo con publicado, escribe solo borradores, publicar = usuario.
-  Migraciones `0005`/`0006`. Auth runner por `CLAUDE_CODE_OAUTH_TOKEN` (CLI fijado en la imagen del worker).
+  Migraciones `0005`/`0006` (las acciones y el router NO requieren migración: `ai_jobs.tipo` es texto).
+  Auth runner por `CLAUDE_CODE_OAUTH_TOKEN` (CLI fijado en la imagen del worker).
   Engine-agnóstico (deps inyectables). **Pendiente (Fase 5):** rotación de token in-app cifrada + banner de
-  estado; observabilidad de jobs en dashboard; intención por clasificación del modelo (hoy heurística).
+  estado; observabilidad de jobs en dashboard; selector de modelo Sonnet/Opus + worker en Sonnet por defecto
+  (cuota); conciliar factura↔gasto.
 - **T5 · Sistema de diseño**: identidad editorial (Inter Tight + Instrument Serif italic, marca violeta
   `#4928fd`, light+dark con next-themes, motion discreto). Primitivas en `src/components/{ui,theme,motion}`.
   Header persistente (grupo `(dashboard)`) + **loading skeletons a medida**. **Storybook 10** (stories + a11y +
