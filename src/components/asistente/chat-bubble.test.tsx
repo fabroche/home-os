@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
 const preguntar = vi.fn();
 const proponer = vi.fn();
@@ -20,6 +20,7 @@ beforeEach(() => {
   preguntar.mockReset();
   proponer.mockReset();
   consultar.mockReset();
+  sessionStorage.clear();
 });
 
 describe("ChatBubble", () => {
@@ -69,6 +70,24 @@ describe("ChatBubble", () => {
     expect(screen.getByText("Naturgy")).toBeInTheDocument();
     expect(proponer).toHaveBeenCalled();
     expect(preguntar).not.toHaveBeenCalled();
+  });
+
+  it("conserva el historial tras desmontar (persistencia)", async () => {
+    preguntar.mockResolvedValue({ ok: true, jobId: "j1" });
+    consultar.mockResolvedValue({ estado: "ok", tipo: "consulta_rag", respuesta: "Balance: 100 €", fuentes: [] });
+
+    const { unmount } = render(<ChatBubble defaultOpen pollMs={5} />);
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), { target: { value: "balance?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(screen.getByText("Balance: 100 €")).toBeInTheDocument());
+
+    unmount();
+    cleanup();
+
+    // Nueva instancia (simula cambiar de sección / reabrir): el historial se restaura.
+    render(<ChatBubble defaultOpen />);
+    await waitFor(() => expect(screen.getByText("Balance: 100 €")).toBeInTheDocument());
+    expect(screen.getByText("balance?")).toBeInTheDocument();
   });
 
   it("muestra el error si el job falla", async () => {

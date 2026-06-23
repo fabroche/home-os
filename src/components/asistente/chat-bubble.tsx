@@ -6,6 +6,8 @@ import { preguntarAsistente, proponerContexto, consultarJob } from "@/lib/action
 import { ChatPanel } from "@/components/asistente/chat-panel";
 import type { ChatMsg } from "@/components/asistente/chat-message";
 
+const STORAGE_KEY = "homeos.chat.v1";
+
 /**
  * Burbuja de chat del Asistente (M6 · F-M6-5/6). FAB flotante que abre el panel;
  * según la intención encola `consulta_rag` (preguntar) o `proponer_contexto`
@@ -39,8 +41,41 @@ export function ChatBubble({
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [pending, setPending] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const primeraPersistencia = useRef(true);
 
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+
+  // Hidrata el historial desde sessionStorage (sobrevive a navegación/cierre/recarga
+  // dentro de la pestaña). Una consulta a medias (pendiente) se cierra al restaurar.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const guardado = JSON.parse(raw) as ChatMsg[];
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación en montaje
+        setMessages(
+          guardado.map((m) =>
+            m.pendiente ? { ...m, pendiente: false, contenido: m.contenido || "(consulta interrumpida)" } : m,
+          ),
+        );
+      }
+    } catch {
+      // sin historial / storage no disponible
+    }
+  }, []);
+
+  // Persiste el historial. Salta la primera ejecución para no pisar lo hidratado.
+  useEffect(() => {
+    if (primeraPersistencia.current) {
+      primeraPersistencia.current = false;
+      return;
+    }
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch {
+      // storage lleno / no disponible: el chat sigue funcionando en memoria
+    }
+  }, [messages]);
 
   function actualizar(id: string, patch: Partial<ChatMsg>) {
     setMessages((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)));
