@@ -17,6 +17,10 @@ RUN npm ci --omit=dev
 
 FROM base AS runner
 ENV NODE_ENV=production
+# Claude Code CLI (motor del runner IA). Versión FIJA para builds reproducibles:
+# el contenedor está aislado del host, así que el `claude` del VPS no sirve aquí.
+# Auth por CLAUDE_CODE_OAUTH_TOKEN (env); subir el número aquí para actualizar.
+RUN npm i -g @anthropic-ai/claude-code@2.1.186
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # tsx ejecuta el worker en TS sin build previo.
