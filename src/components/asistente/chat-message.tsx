@@ -12,6 +12,8 @@ export type ChatMsg = {
   contenido: string;
   fuentes?: Fuente[];
   pendiente?: boolean;
+  /** Job en curso asociado a un mensaje pendiente: permite reanudar el polling tras recargar/reabrir. */
+  jobId?: string;
   /** Si está presente, el mensaje es una propuesta de contexto (se renderiza como tarjeta). */
   borrador?: BorradorContexto;
 };
