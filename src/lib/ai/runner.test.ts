@@ -44,6 +44,7 @@ const fragmento: FragmentoContexto = {
 const recuperar = async () => [fragmento];
 const listar = async () => [fragmento];
 const finanzas = async () => "Balance global: 100,00 €";
+const pendientes = async () => "id:pg1 | Luz | 30.00 € | 2026-06-01";
 
 beforeEach(() => {
   tomarSiguienteMock.mockReset();
@@ -90,13 +91,13 @@ describe("extraerJson", () => {
 describe("ejecutarJob", () => {
   it("consulta_rag: valida y devuelve la salida conforme", async () => {
     const invocar = async () => JSON.stringify({ respuesta: "Leo te debe 50€", fuentes: [{ id: "c1", titulo: "Leo" }] });
-    const res = (await ejecutarJob(job(), { invocar, recuperar, listar, finanzas })) as { respuesta: string };
+    const res = (await ejecutarJob(job(), { invocar, recuperar, listar, finanzas, pendientes })) as { respuesta: string };
     expect(res.respuesta).toBe("Leo te debe 50€");
   });
 
   it("lanza (reintentable) si la salida no conforma el esquema", async () => {
     const invocar = async () => JSON.stringify({ fuentes: [] }); // falta respuesta
-    await expect(ejecutarJob(job(), { invocar, recuperar, listar, finanzas })).rejects.toThrow();
+    await expect(ejecutarJob(job(), { invocar, recuperar, listar, finanzas, pendientes })).rejects.toThrow();
   });
 
   it("registrar_gasto: valida y devuelve la propuesta de gasto", async () => {
@@ -106,7 +107,7 @@ describe("ejecutarJob", () => {
         propuesta: { nombre: "Comida", importe: 40, categoria: "Comida", tipo: "Gasto Variable", fecha: "2026-06-23", estado: "Pending" },
         nota: "",
       });
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas })) as {
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
       propuesta: { importe: number } | null;
     };
     expect(res.propuesta?.importe).toBe(40);
@@ -115,12 +116,52 @@ describe("ejecutarJob", () => {
   it("registrar_gasto: acepta propuesta null con nota cuando falta info", async () => {
     const j = job({ tipo: "registrar_gasto", payload: { peticion: "registra un gasto en comida" } });
     const invocar = async () => JSON.stringify({ propuesta: null, nota: "¿De cuánto fue el gasto?" });
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas })) as {
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
       propuesta: null;
       nota: string;
     };
     expect(res.propuesta).toBeNull();
     expect(res.nota).toMatch(/cuánto/i);
+  });
+
+  it("registrar_ingreso: valida y devuelve la propuesta de ingreso", async () => {
+    const j = job({ tipo: "registrar_ingreso", payload: { peticion: "mi salario de 1500€" } });
+    const invocar = async () =>
+      JSON.stringify({
+        propuesta: { nombre: "Salario", importe: 1500, categoria: "Salario", tipo: "Ingreso Fijo", fecha: "2026-06-23", estado: "Pending" },
+        nota: "",
+      });
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+      propuesta: { tipo: string } | null;
+    };
+    expect(res.propuesta?.tipo).toBe("Ingreso Fijo");
+  });
+
+  it("registrar_deuda: valida y devuelve la propuesta de deuda", async () => {
+    const j = job({ tipo: "registrar_deuda", payload: { peticion: "le presté 50 a Leo" } });
+    const invocar = async () =>
+      JSON.stringify({
+        propuesta: { concepto: "Préstamo", persona: "Leo", valor: 50, movimiento: "deuda", fecha: "2026-06-23" },
+        nota: "",
+      });
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+      propuesta: { persona: string; valor: number } | null;
+    };
+    expect(res.propuesta).toMatchObject({ persona: "Leo", valor: 50 });
+  });
+
+  it("marcar_pagado: incluye la lista de pendientes en el prompt y devuelve el id elegido", async () => {
+    const j = job({ tipo: "marcar_pagado", payload: { peticion: "marca como pagada la luz" } });
+    let promptVisto = "";
+    const invocar = async (p: string) => {
+      promptVisto = p;
+      return JSON.stringify({ movimiento: { id: "pg1", nombre: "Luz", importe: 30 }, nota: "" });
+    };
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+      movimiento: { id: string } | null;
+    };
+    expect(promptVisto).toContain("id:pg1 | Luz"); // se le pasó la lista de pendientes
+    expect(res.movimiento?.id).toBe("pg1");
   });
 
   it("proponer_contexto: acepta JSON con fences y borradores", async () => {
@@ -129,7 +170,7 @@ describe("ejecutarJob", () => {
       "```json\n" +
       JSON.stringify({ borradores: [{ tipo: "proveedor", titulo: "Naturgy", contenido: "Compañía de gas", tags: ["gas"] }] }) +
       "\n```";
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas })) as { borradores: unknown[] };
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as { borradores: unknown[] };
     expect(res.borradores).toHaveLength(1);
   });
 });
@@ -147,7 +188,7 @@ describe("drenarCola", () => {
   it("procesa un job y lo cierra como ok", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job()).mockResolvedValueOnce(null);
     const invocar = async () => JSON.stringify({ respuesta: "ok", fuentes: [] });
-    const r = await drenarCola({ invocar, recuperar, listar, finanzas });
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes });
     expect(r).toMatchObject({ procesados: 1, ok: 1, reintentos: 0, errores: 0 });
     expect(marcarMock).toHaveBeenCalledWith(
       "j1",
@@ -159,7 +200,7 @@ describe("drenarCola", () => {
   it("re-encola (backoff) si falla y quedan intentos", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job({ intentos: 1 })).mockResolvedValueOnce(null);
     const invocar = async () => "{ esto no es json";
-    const r = await drenarCola({ invocar, recuperar, listar, finanzas }, 3);
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes }, 3);
     expect(r.reintentos).toBe(1);
     expect(reintentarMock).toHaveBeenCalledWith("j1", expect.any(Number), expect.any(String));
     expect(marcarMock).not.toHaveBeenCalled();
@@ -168,7 +209,7 @@ describe("drenarCola", () => {
   it("marca error terminal al agotar los intentos", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job({ intentos: 3 })).mockResolvedValueOnce(null);
     const invocar = async () => "{ esto no es json";
-    const r = await drenarCola({ invocar, recuperar, listar, finanzas }, 3);
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes }, 3);
     expect(r.errores).toBe(1);
     expect(marcarMock).toHaveBeenCalledWith("j1", "error", expect.objectContaining({ error: expect.any(String) }));
     expect(reintentarMock).not.toHaveBeenCalled();

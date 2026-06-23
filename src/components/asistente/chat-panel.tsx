@@ -6,6 +6,8 @@ import { X, Send, Sparkles } from "lucide-react";
 import { ChatMessage, type ChatMsg } from "@/components/asistente/chat-message";
 import { SuggestionCard } from "@/components/asistente/suggestion-card";
 import { ActionCard } from "@/components/asistente/action-card";
+import { DeudaCard } from "@/components/asistente/deuda-card";
+import { MarcarPagadoCard } from "@/components/asistente/marcar-pagado-card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +82,10 @@ export function ChatPanel({
               <SuggestionCard key={m.id} borrador={m.borrador} />
             ) : m.propuestaGasto ? (
               <ActionCard key={m.id} propuesta={m.propuestaGasto} />
+            ) : m.propuestaDeuda ? (
+              <DeudaCard key={m.id} propuesta={m.propuestaDeuda} />
+            ) : m.movimientoPagar ? (
+              <MarcarPagadoCard key={m.id} movimiento={m.movimientoPagar} />
             ) : (
               <ChatMessage key={m.id} msg={m} />
             ),

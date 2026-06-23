@@ -4,7 +4,8 @@ import { motion } from "motion/react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorradorContexto } from "@/types/ai";
-import type { CrearMovimientoInput } from "@/types/finanzas";
+import type { CrearMovimientoInput, CrearDeudaInput } from "@/types/finanzas";
+import type { MovimientoAPagar } from "@/components/asistente/marcar-pagado-card";
 
 export type Fuente = { id: string; titulo: string };
 export type ChatMsg = {
@@ -17,8 +18,12 @@ export type ChatMsg = {
   jobId?: string;
   /** Si está presente, el mensaje es una propuesta de contexto (se renderiza como tarjeta). */
   borrador?: BorradorContexto;
-  /** Si está presente, el mensaje es una propuesta de gasto a confirmar (se renderiza como tarjeta). */
+  /** Si está presente, el mensaje es una propuesta de movimiento (gasto/ingreso) a confirmar. */
   propuestaGasto?: CrearMovimientoInput;
+  /** Si está presente, el mensaje es una propuesta de deuda/pago a confirmar. */
+  propuestaDeuda?: CrearDeudaInput;
+  /** Si está presente, el mensaje es un gasto pendiente a marcar como pagado. */
+  movimientoPagar?: MovimientoAPagar;
 };
 
 /** Una burbuja de mensaje del asistente (usuario a la derecha, IA a la izquierda). */

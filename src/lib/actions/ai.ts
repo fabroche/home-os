@@ -9,9 +9,15 @@ import {
   ProponerContextoOutputSchema,
   RegistrarGastoPayloadSchema,
   RegistrarGastoOutputSchema,
+  RegistrarIngresoPayloadSchema,
+  RegistrarDeudaPayloadSchema,
+  RegistrarDeudaOutputSchema,
+  MarcarPagadoPayloadSchema,
+  MarcarPagadoOutputSchema,
+  type MarcarPagadoOutput,
   type BorradorContexto,
 } from "@/types/ai";
-import type { CrearMovimientoInput } from "@/types/finanzas";
+import type { CrearMovimientoInput, CrearDeudaInput } from "@/types/finanzas";
 
 /**
  * Server Actions del Asistente IA (M6 · F-M6-5/6). La app **encola** una tarea y
@@ -69,11 +75,53 @@ export async function registrarGasto(input: unknown): Promise<EncolarResult> {
   }
 }
 
+/** Encola una petición de registrar un ingreso (`registrar_ingreso`). La IA solo propone. */
+export async function registrarIngreso(input: unknown): Promise<EncolarResult> {
+  const parsed = RegistrarIngresoPayloadSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Describe el ingreso que querés registrar." };
+  try {
+    const user = await requireUser();
+    const job = await encolar(user.id, "registrar_ingreso", parsed.data);
+    return { ok: true, jobId: job.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al registrar." };
+  }
+}
+
+/** Encola una petición de registrar una deuda/pago (`registrar_deuda`). La IA solo propone. */
+export async function registrarDeuda(input: unknown): Promise<EncolarResult> {
+  const parsed = RegistrarDeudaPayloadSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Describe la deuda o el pago que querés registrar." };
+  try {
+    const user = await requireUser();
+    const job = await encolar(user.id, "registrar_deuda", parsed.data);
+    return { ok: true, jobId: job.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al registrar." };
+  }
+}
+
+/** Encola una petición de marcar un gasto como pagado (`marcar_pagado`). La IA solo propone cuál. */
+export async function marcarPagado(input: unknown): Promise<EncolarResult> {
+  const parsed = MarcarPagadoPayloadSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Dime qué gasto marco como pagado." };
+  try {
+    const user = await requireUser();
+    const job = await encolar(user.id, "marcar_pagado", parsed.data);
+    return { ok: true, jobId: job.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al marcar." };
+  }
+}
+
 export type JobEstado =
   | { estado: "pendiente" | "ejecutando" | "desconocido" }
   | { estado: "ok"; tipo: "consulta_rag"; respuesta: string; fuentes: { id: string; titulo: string }[] }
   | { estado: "ok"; tipo: "proponer_contexto"; borradores: BorradorContexto[] }
   | { estado: "ok"; tipo: "registrar_gasto"; propuesta: CrearMovimientoInput | null; nota?: string }
+  | { estado: "ok"; tipo: "registrar_ingreso"; propuesta: CrearMovimientoInput | null; nota?: string }
+  | { estado: "ok"; tipo: "registrar_deuda"; propuestaDeuda: CrearDeudaInput | null; nota?: string }
+  | { estado: "ok"; tipo: "marcar_pagado"; movimiento: MarcarPagadoOutput["movimiento"]; nota?: string }
   | { estado: "error"; error: string };
 
 /** Sondea el estado/resultado de un job propio (lo llama el polling de la burbuja). */
@@ -89,10 +137,20 @@ export async function consultarJob(jobId: string): Promise<JobEstado> {
         if (!out.success) return { estado: "error", error: "Propuesta no válida." };
         return { estado: "ok", tipo: "proponer_contexto", borradores: out.data.borradores };
       }
-      if (job.tipo === "registrar_gasto") {
+      if (job.tipo === "registrar_gasto" || job.tipo === "registrar_ingreso") {
         const out = RegistrarGastoOutputSchema.safeParse(job.resultado);
-        if (!out.success) return { estado: "error", error: "Propuesta de gasto no válida." };
-        return { estado: "ok", tipo: "registrar_gasto", propuesta: out.data.propuesta, nota: out.data.nota };
+        if (!out.success) return { estado: "error", error: "Propuesta de movimiento no válida." };
+        return { estado: "ok", tipo: job.tipo, propuesta: out.data.propuesta, nota: out.data.nota };
+      }
+      if (job.tipo === "registrar_deuda") {
+        const out = RegistrarDeudaOutputSchema.safeParse(job.resultado);
+        if (!out.success) return { estado: "error", error: "Propuesta de deuda no válida." };
+        return { estado: "ok", tipo: "registrar_deuda", propuestaDeuda: out.data.propuesta, nota: out.data.nota };
+      }
+      if (job.tipo === "marcar_pagado") {
+        const out = MarcarPagadoOutputSchema.safeParse(job.resultado);
+        if (!out.success) return { estado: "error", error: "No pude identificar el gasto." };
+        return { estado: "ok", tipo: "marcar_pagado", movimiento: out.data.movimiento, nota: out.data.nota };
       }
       const out = ConsultaRagOutputSchema.safeParse(job.resultado);
       if (!out.success) return { estado: "error", error: "Respuesta no válida." };

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TIPOS_CONTEXTO } from "@/types/contexto";
-import { CrearMovimientoInputSchema } from "@/types/finanzas";
+import { CrearMovimientoInputSchema, CrearDeudaInputSchema } from "@/types/finanzas";
 
 /**
  * Tipos de dominio del Asistente IA (M6). La cola `ai_jobs` guarda tareas tipadas
@@ -18,6 +18,9 @@ export const AI_JOB_TIPOS = [
   "consulta_rag",
   "proponer_contexto",
   "registrar_gasto",
+  "registrar_ingreso",
+  "registrar_deuda",
+  "marcar_pagado",
 ] as const;
 export type AiJobTipo = (typeof AI_JOB_TIPOS)[number];
 
@@ -40,6 +43,12 @@ export const RegistrarGastoPayloadSchema = z.object({
 });
 export type RegistrarGastoPayload = z.infer<typeof RegistrarGastoPayloadSchema>;
 
+// Ingreso, deuda y marcar-pagado comparten la forma de payload (una petición en
+// lenguaje natural). Se mantienen como esquemas propios por claridad de contrato.
+export const RegistrarIngresoPayloadSchema = RegistrarGastoPayloadSchema;
+export const RegistrarDeudaPayloadSchema = RegistrarGastoPayloadSchema;
+export const MarcarPagadoPayloadSchema = RegistrarGastoPayloadSchema;
+
 /**
  * Registro de esquemas de payload por tipo. Solo se pueden encolar tipos con
  * esquema (evita meter payloads sin validar). Los demás tipos se añaden cuando se
@@ -49,6 +58,9 @@ export const JOB_PAYLOAD_SCHEMAS = {
   consulta_rag: ConsultaRagPayloadSchema,
   proponer_contexto: ProponerContextoPayloadSchema,
   registrar_gasto: RegistrarGastoPayloadSchema,
+  registrar_ingreso: RegistrarIngresoPayloadSchema,
+  registrar_deuda: RegistrarDeudaPayloadSchema,
+  marcar_pagado: MarcarPagadoPayloadSchema,
 } satisfies Partial<Record<AiJobTipo, z.ZodTypeAny>>;
 
 export type TipoEncolable = keyof typeof JOB_PAYLOAD_SCHEMAS;
@@ -86,10 +98,40 @@ export const RegistrarGastoOutputSchema = z.object({
 });
 export type RegistrarGastoOutput = z.infer<typeof RegistrarGastoOutputSchema>;
 
+/** Ingreso: mismo contrato que gasto (propuesta de movimiento validada igual). */
+export const RegistrarIngresoOutputSchema = RegistrarGastoOutputSchema;
+
+/** Deuda: la IA propone un alta de deuda/pago; el usuario confirma. */
+export const RegistrarDeudaOutputSchema = z.object({
+  propuesta: CrearDeudaInputSchema.nullable(),
+  nota: z.string().trim().max(500).optional(),
+});
+export type RegistrarDeudaOutput = z.infer<typeof RegistrarDeudaOutputSchema>;
+
+/**
+ * Marcar pagado: la IA elige, de entre los movimientos PENDIENTES que se le pasan,
+ * cuál marcar como pagado (devuelve su id de página de Notion) o `movimiento: null`
+ * con una `nota` si no lo tiene claro. El usuario confirma antes de ejecutar.
+ */
+export const MarcarPagadoOutputSchema = z.object({
+  movimiento: z
+    .object({
+      id: z.string().trim().min(1),
+      nombre: z.string().trim().min(1),
+      importe: z.number(),
+    })
+    .nullable(),
+  nota: z.string().trim().max(500).optional(),
+});
+export type MarcarPagadoOutput = z.infer<typeof MarcarPagadoOutputSchema>;
+
 export const JOB_OUTPUT_SCHEMAS = {
   consulta_rag: ConsultaRagOutputSchema,
   proponer_contexto: ProponerContextoOutputSchema,
   registrar_gasto: RegistrarGastoOutputSchema,
+  registrar_ingreso: RegistrarIngresoOutputSchema,
+  registrar_deuda: RegistrarDeudaOutputSchema,
+  marcar_pagado: MarcarPagadoOutputSchema,
 } satisfies Partial<Record<AiJobTipo, z.ZodTypeAny>>;
 
 /** DTO de dominio de un job (mapea la fila de `ai_jobs`). */

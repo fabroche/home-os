@@ -11,13 +11,20 @@ vi.mock("@/lib/actions/ai", () => ({
   preguntarAsistente: (...a: unknown[]) => preguntar(...a),
   proponerContexto: (...a: unknown[]) => proponer(...a),
   registrarGasto: (...a: unknown[]) => registrar(...a),
+  registrarIngreso: vi.fn(),
+  registrarDeuda: vi.fn(),
+  marcarPagado: vi.fn(),
   consultarJob: (...a: unknown[]) => consultar(...a),
 }));
-// SuggestionCard / ActionCard (vía ChatPanel) importan estas Server Actions.
+// SuggestionCard / ActionCard / DeudaCard / MarcarPagadoCard (vía ChatPanel) importan Server Actions.
 vi.mock("@/lib/actions/contexto", () => ({ guardarEntrada: vi.fn() }));
-vi.mock("@/lib/actions/finanzas", () => ({ crearMovimiento: vi.fn() }));
+vi.mock("@/lib/actions/finanzas", () => ({
+  crearMovimiento: vi.fn(),
+  crearDeuda: vi.fn(),
+  cambiarEstadoMovimiento: vi.fn(),
+}));
 
-import { ChatBubble } from "@/components/asistente/chat-bubble";
+import { ChatBubble, detectarIntencion } from "@/components/asistente/chat-bubble";
 
 beforeEach(() => {
   preguntar.mockReset();
@@ -25,6 +32,25 @@ beforeEach(() => {
   registrar.mockReset();
   consultar.mockReset();
   sessionStorage.clear();
+});
+
+describe("detectarIntencion", () => {
+  it("distingue acciones de preguntas-insight", () => {
+    // Acciones
+    expect(detectarIntencion("apúntame un gasto de 40€ en comida")).toBe("gasto");
+    expect(detectarIntencion("gasté 12 en el bar")).toBe("gasto");
+    expect(detectarIntencion("registra mi salario de 1500€")).toBe("ingreso");
+    expect(detectarIntencion("cobré 200 de un cliente")).toBe("ingreso");
+    expect(detectarIntencion("le presté 50 a Leo")).toBe("deuda");
+    expect(detectarIntencion("le debo 30 a Guille")).toBe("deuda");
+    expect(detectarIntencion("marca como pagada la luz")).toBe("pagado");
+    // Preguntas-insight (NO deben dispararse como acción)
+    expect(detectarIntencion("¿en qué gasto más?")).toBe("preguntar");
+    expect(detectarIntencion("¿a quién le debo más?")).toBe("preguntar");
+    expect(detectarIntencion("¿cuál es mi ingreso principal?")).toBe("preguntar");
+    // Enseñar contexto
+    expect(detectarIntencion("recuérdame que Naturgy es mi proveedor de gas")).toBe("ensenar");
+  });
 });
 
 describe("ChatBubble", () => {

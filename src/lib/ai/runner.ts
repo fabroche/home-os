@@ -12,7 +12,7 @@ import {
   ingresosPorCategoria,
 } from "@/lib/finanzas/aggregations";
 import { JOB_OUTPUT_SCHEMAS, type AiJob } from "@/types/ai";
-import { CATEGORIAS, TIPOS } from "@/types/finanzas";
+import { CATEGORIAS, TIPOS, PERSONAS_DEUDA } from "@/types/finanzas";
 import type { FragmentoContexto } from "@/types/contexto";
 
 /**
@@ -27,8 +27,7 @@ import type { FragmentoContexto } from "@/types/contexto";
 function textoEntrada(job: AiJob): string {
   const p = (job.payload ?? {}) as Record<string, unknown>;
   if (job.tipo === "consulta_rag") return String(p.pregunta ?? "");
-  if (job.tipo === "proponer_contexto" || job.tipo === "registrar_gasto") return String(p.peticion ?? "");
-  return "";
+  return String(p.peticion ?? ""); // resto de tareas usan `peticion`
 }
 
 /** Construye el prompt (puro y testeable). `datos` = snapshot financiero (consulta_rag). */
@@ -60,20 +59,58 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
     ].join("\n");
   }
 
-  if (job.tipo === "registrar_gasto") {
-    const tiposGasto = TIPOS.filter((t) => t.startsWith("Gasto"));
+  if (job.tipo === "registrar_gasto" || job.tipo === "registrar_ingreso") {
+    const esIngreso = job.tipo === "registrar_ingreso";
+    const concepto = esIngreso ? "INGRESO" : "GASTO";
+    const tiposValidos = TIPOS.filter((t) => t.startsWith(esIngreso ? "Ingreso" : "Gasto"));
+    const porDefecto = esIngreso ? "Ingreso Variable" : "Gasto Variable";
     const hoy = datos ?? "";
     return [
-      "Eres el asistente de home-os. El usuario quiere registrar un GASTO a partir de su PETICIÓN.",
+      `Eres el asistente de home-os. El usuario quiere registrar un ${concepto} a partir de su PETICIÓN.`,
       "Extrae los campos y PROPÓN el movimiento (no lo ejecutas tú; el usuario lo confirmará).",
       `Hoy es ${hoy}. Si no indica fecha, usa la de hoy (formato YYYY-MM-DD).`,
       `categoria DEBE ser una de: ${CATEGORIAS.join(", ")}.`,
-      `tipo DEBE ser uno de: ${tiposGasto.join(", ")} (elige el más razonable; por defecto "Gasto Variable").`,
-      "importe = número positivo en euros (la magnitud del gasto). estado = \"Pending\".",
-      "nombre = una descripción corta del gasto.",
+      `tipo DEBE ser uno de: ${tiposValidos.join(", ")} (elige el más razonable; por defecto "${porDefecto}").`,
+      `importe = número positivo en euros (la magnitud del ${concepto.toLowerCase()}). estado = "Pending".`,
+      `nombre = una descripción corta del ${concepto.toLowerCase()}.`,
       "Si NO puedes deducir el importe, devuelve propuesta: null y explica qué falta en `nota`.",
       "Devuelve EXCLUSIVAMENTE un JSON válido, sin markdown, con esta forma:",
       '{ "propuesta": { "nombre": string, "importe": number, "categoria": string, "tipo": string, "fecha": "YYYY-MM-DD", "estado": "Pending" } | null, "nota": string }',
+      "",
+      "=== PETICIÓN ===",
+      entrada,
+    ].join("\n");
+  }
+
+  if (job.tipo === "registrar_deuda") {
+    const hoy = datos ?? "";
+    return [
+      "Eres el asistente de home-os. El usuario quiere registrar una DEUDA o un PAGO de deuda con una persona.",
+      "Extrae los campos y PROPÓN el registro (no lo ejecutas tú; el usuario lo confirmará).",
+      `Hoy es ${hoy}. Si no indica fecha, usa la de hoy (YYYY-MM-DD).`,
+      `Personas conocidas: ${PERSONAS_DEUDA.join(", ")} (si menciona otra, usa ese nombre tal cual).`,
+      'movimiento = "deuda" si nace o crece lo que se debe; "pago" si se salda o devuelve.',
+      "valor = número positivo en euros (magnitud). concepto = descripción corta.",
+      "Si te falta la persona o el importe, devuelve propuesta: null y explícalo en `nota`.",
+      "Devuelve EXCLUSIVAMENTE un JSON válido, sin markdown:",
+      '{ "propuesta": { "concepto": string, "persona": string, "valor": number, "movimiento": "deuda"|"pago", "fecha": "YYYY-MM-DD" } | null, "nota": string }',
+      "",
+      "=== PETICIÓN ===",
+      entrada,
+    ].join("\n");
+  }
+
+  if (job.tipo === "marcar_pagado") {
+    const lista = datos || "(no hay gastos pendientes)";
+    return [
+      "Eres el asistente de home-os. El usuario quiere MARCAR como pagado uno de sus gastos PENDIENTES.",
+      "Elige de la LISTA el movimiento que mejor coincide con su PETICIÓN y devuelve su id EXACTO.",
+      "Si ninguno coincide con claridad, devuelve movimiento: null y pide una aclaración en `nota`.",
+      "Devuelve EXCLUSIVAMENTE un JSON válido, sin markdown:",
+      '{ "movimiento": { "id": string, "nombre": string, "importe": number } | null, "nota": string }',
+      "",
+      "=== GASTOS PENDIENTES ===",
+      lista,
       "",
       "=== PETICIÓN ===",
       entrada,
@@ -172,17 +209,34 @@ async function snapshotFinanzas(): Promise<string> {
   return lineas.join("\n");
 }
 
+/** Lista de gastos PENDIENTES (con su id de Notion) para que la IA elija al marcar pagado. */
+async function movimientosPendientes(): Promise<string> {
+  const movs = await listMovimientos();
+  const pend = movs
+    .filter((m) => m.estado === "Pending" && m.flujo === "gasto")
+    .slice(0, 40);
+  if (!pend.length) return "(no hay gastos pendientes)";
+  return pend
+    .map(
+      (m) =>
+        `id:${m.notionPageId} | ${m.nombre} | ${Math.abs(m.importe ?? 0).toFixed(2)} € | ${m.fecha ?? "sin fecha"}`,
+    )
+    .join("\n");
+}
+
 export type RunnerDeps = {
   invocar: (prompt: string) => Promise<string>;
   recuperar: typeof recuperarContexto;
   listar: typeof listarContexto;
   finanzas: () => Promise<string>;
+  pendientes: () => Promise<string>;
 };
 const defaultDeps: RunnerDeps = {
   invocar: invocarClaude,
   recuperar: recuperarContexto,
   listar: listarContexto,
   finanzas: snapshotFinanzas,
+  pendientes: movimientosPendientes,
 };
 
 /**
@@ -200,13 +254,16 @@ export async function ejecutarJob(job: AiJob, deps: RunnerDeps = defaultDeps): P
       ? await deps.listar(job.userId)
       : job.tipo === "consulta_rag"
         ? await deps.recuperar(job.userId, { consulta: textoEntrada(job), k: 8 })
-        : []; // registrar_gasto no necesita contexto del banco
+        : []; // las acciones (registrar_*, marcar_pagado) no necesitan contexto del banco
+  const hoy = () => new Date().toISOString().slice(0, 10);
   const datos =
     job.tipo === "consulta_rag"
       ? await deps.finanzas()
-      : job.tipo === "registrar_gasto"
-        ? new Date().toISOString().slice(0, 10) // fecha de hoy para el prompt
-        : undefined;
+      : job.tipo === "registrar_gasto" || job.tipo === "registrar_ingreso" || job.tipo === "registrar_deuda"
+        ? hoy() // fecha de hoy para el prompt
+        : job.tipo === "marcar_pagado"
+          ? await deps.pendientes() // lista de gastos pendientes a elegir
+          : undefined;
   const prompt = construirPrompt(job, fragmentos, datos);
   const raw = await deps.invocar(prompt);
   return schema.parse(extraerJson(raw)); // ZodError ⇒ el job se marca error (reintentable)
