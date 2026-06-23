@@ -46,3 +46,6 @@ Thumbs.db
 
 *storybook.log
 storybook-static
+
+# scratchpad de trabajo (prompts, borradores; no es código del proyecto)
+/scratchpad

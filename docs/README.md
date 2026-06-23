@@ -15,14 +15,14 @@ arquitectura y el método de documentación de `larissa-esteves-web`, añadiendo
 ## Organización (híbrido en 2 niveles)
 - **GLOBAL** (`00-overview/`) — visión, arquitectura C4, **ER global** canónico, mapa de casos de uso, convenciones.
 - **MÓDULO** (`modules/`) — un documento por módulo, con una sección por funcionalidad.
-- **TRANSVERSAL** (`transversal/`) — integraciones (Notion, correo, Calendar), infra/DevOps, diseño, **mobile-first**, calidad.
+- **TRANSVERSAL** (`transversal/`) — integraciones (Notion, correo, Calendar), infra/DevOps, diseño, **mobile-first**, calidad, **generador de documentos PDF**.
 
 ```
 docs/
   README.md
   00-overview/{00-vision-y-alcance,01-arquitectura-c4,02-modelo-datos-global,03-mapa-casos-de-uso,04-convenciones}.md
   modules/{M1-finanzas,M2-calendario-inteligente,M3-backoffice-correo,M4-banco-contexto,M5-dashboard,M6-asistente-ia,M7-auth-seguridad}.md
-  transversal/{integracion-notion,integracion-correo,integracion-calendar,infra-devops,sistema-de-diseno,mobile-first,calidad-y-pruebas}.md
+  transversal/{integracion-notion,integracion-correo,integracion-calendar,infra-devops,sistema-de-diseno,mobile-first,calidad-y-pruebas,generador-documentos-pdf}.md
   _templates/{modulo,funcionalidad}.md
 ```
 
