@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { BorradorContexto } from "@/types/ai";
 import type { CrearMovimientoInput, CrearDeudaInput } from "@/types/finanzas";
 import type { MovimientoAPagar } from "@/components/asistente/marcar-pagado-card";
+import type { AclararData } from "@/components/asistente/aclarar-card";
 
 export type Fuente = { id: string; titulo: string };
 export type ChatMsg = {
@@ -24,6 +25,10 @@ export type ChatMsg = {
   propuestaDeuda?: CrearDeudaInput;
   /** Si está presente, el mensaje es un gasto pendiente a marcar como pagado. */
   movimientoPagar?: MovimientoAPagar;
+  /** Si está presente, el router pidió aclarar la intención (se renderiza como tarjeta de opciones). */
+  aclarar?: AclararData;
+  /** Mensaje original del usuario (en el bubble pendiente del router): lo necesita la tarjeta "aclarar". */
+  mensajeOrigen?: string;
 };
 
 /** Una burbuja de mensaje del asistente (usuario a la derecha, IA a la izquierda). */

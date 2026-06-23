@@ -21,6 +21,7 @@ export const AI_JOB_TIPOS = [
   "registrar_ingreso",
   "registrar_deuda",
   "marcar_pagado",
+  "asistente",
 ] as const;
 export type AiJobTipo = (typeof AI_JOB_TIPOS)[number];
 
@@ -50,6 +51,16 @@ export const RegistrarDeudaPayloadSchema = RegistrarGastoPayloadSchema;
 export const MarcarPagadoPayloadSchema = RegistrarGastoPayloadSchema;
 
 /**
+ * Router único del asistente (`asistente`): el usuario manda un MENSAJE en lenguaje
+ * natural y el modelo decide la intención en UNA pasada (responder/registrar/…/aclarar).
+ * Sustituye a la heurística de intención del cliente: clasificar lo hace el modelo.
+ */
+export const AsistentePayloadSchema = z.object({
+  mensaje: z.string().trim().min(1, "El mensaje es obligatorio").max(2000),
+});
+export type AsistentePayload = z.infer<typeof AsistentePayloadSchema>;
+
+/**
  * Registro de esquemas de payload por tipo. Solo se pueden encolar tipos con
  * esquema (evita meter payloads sin validar). Los demás tipos se añaden cuando se
  * implemente su módulo consumidor (M1/M2/M3).
@@ -61,6 +72,7 @@ export const JOB_PAYLOAD_SCHEMAS = {
   registrar_ingreso: RegistrarIngresoPayloadSchema,
   registrar_deuda: RegistrarDeudaPayloadSchema,
   marcar_pagado: MarcarPagadoPayloadSchema,
+  asistente: AsistentePayloadSchema,
 } satisfies Partial<Record<AiJobTipo, z.ZodTypeAny>>;
 
 export type TipoEncolable = keyof typeof JOB_PAYLOAD_SCHEMAS;
@@ -125,6 +137,47 @@ export const MarcarPagadoOutputSchema = z.object({
 });
 export type MarcarPagadoOutput = z.infer<typeof MarcarPagadoOutputSchema>;
 
+/**
+ * Acciones concretas que el router puede ejecutar (y a las que apunta cada opción de
+ * "aclarar"). NO incluye "aclarar": una opción de desambiguación siempre resuelve a
+ * una acción real.
+ */
+export const ACCIONES_ASISTENTE = ["responder", "gasto", "ingreso", "deuda", "pagado", "contexto"] as const;
+export type AccionAsistente = (typeof ACCIONES_ASISTENTE)[number];
+
+const NotaSchema = z.string().trim().max(500).optional();
+const FuenteSchema = z.object({ id: z.string(), titulo: z.string() });
+const MovimientoElegidoSchema = z.object({
+  id: z.string().trim().min(1),
+  nombre: z.string().trim().min(1),
+  importe: z.number(),
+});
+
+/**
+ * Salida del router `asistente`: en UNA sola pasada el modelo clasifica la intención y
+ * produce la propuesta correspondiente, o pide aclaración (`aclarar`) cuando el mensaje
+ * podría interpretarse de más de una forma. Reutiliza los MISMOS sub-esquemas que las
+ * acciones dedicadas, así la propuesta es directamente confirmable. La IA nunca escribe:
+ * cada propuesta se confirma luego (gobernanza "propone → aprueba → crea").
+ */
+export const AsistenteOutputSchema = z.discriminatedUnion("accion", [
+  z.object({ accion: z.literal("responder"), respuesta: z.string().trim().min(1), fuentes: z.array(FuenteSchema).default([]) }),
+  z.object({ accion: z.literal("gasto"), propuesta: CrearMovimientoInputSchema.nullable(), nota: NotaSchema }),
+  z.object({ accion: z.literal("ingreso"), propuesta: CrearMovimientoInputSchema.nullable(), nota: NotaSchema }),
+  z.object({ accion: z.literal("deuda"), propuesta: CrearDeudaInputSchema.nullable(), nota: NotaSchema }),
+  z.object({ accion: z.literal("pagado"), movimiento: MovimientoElegidoSchema.nullable(), nota: NotaSchema }),
+  z.object({ accion: z.literal("contexto"), borradores: z.array(BorradorContextoSchema).min(1).max(5) }),
+  z.object({
+    accion: z.literal("aclarar"),
+    pregunta: z.string().trim().min(1).max(300),
+    opciones: z
+      .array(z.object({ etiqueta: z.string().trim().min(1).max(80), accion: z.enum(ACCIONES_ASISTENTE) }))
+      .min(2)
+      .max(4),
+  }),
+]);
+export type AsistenteOutput = z.infer<typeof AsistenteOutputSchema>;
+
 export const JOB_OUTPUT_SCHEMAS = {
   consulta_rag: ConsultaRagOutputSchema,
   proponer_contexto: ProponerContextoOutputSchema,
@@ -132,6 +185,7 @@ export const JOB_OUTPUT_SCHEMAS = {
   registrar_ingreso: RegistrarIngresoOutputSchema,
   registrar_deuda: RegistrarDeudaOutputSchema,
   marcar_pagado: MarcarPagadoOutputSchema,
+  asistente: AsistenteOutputSchema,
 } satisfies Partial<Record<AiJobTipo, z.ZodTypeAny>>;
 
 /** DTO de dominio de un job (mapea la fila de `ai_jobs`). */

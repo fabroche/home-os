@@ -78,6 +78,17 @@ describe("construirPrompt", () => {
     expect(p).toContain("2026-06-23"); // fecha de hoy
     expect(p).toMatch(/propuesta/);
   });
+
+  it("asistente (router): enumera las acciones, incluye el mensaje y los datos, y permite aclarar", () => {
+    const j = job({ tipo: "asistente", payload: { mensaje: "ya pagué la luz" } });
+    const p = construirPrompt(j, [fragmento], "FECHA DE HOY: 2026-06-23\n\n=== DATOS FINANCIEROS ===\nBalance global: 100,00 €");
+    expect(p).toContain("ya pagué la luz"); // el MENSAJE del usuario
+    expect(p).toContain("Balance global: 100,00 €"); // los datos combinados
+    expect(p).toContain('"aclarar"'); // puede pedir desambiguación
+    expect(p).toMatch(/"responder"/);
+    expect(p).toMatch(/"gasto"\|"ingreso"/);
+    expect(p).toContain("Leo"); // contexto recuperado
+  });
 });
 
 describe("extraerJson", () => {
@@ -162,6 +173,58 @@ describe("ejecutarJob", () => {
     };
     expect(promptVisto).toContain("id:pg1 | Luz"); // se le pasó la lista de pendientes
     expect(res.movimiento?.id).toBe("pg1");
+  });
+
+  it("asistente: clasifica como gasto y devuelve la propuesta (con datos+pendientes en el prompt)", async () => {
+    const j = job({ tipo: "asistente", payload: { mensaje: "gasté 40 en comida" } });
+    let promptVisto = "";
+    const invocar = async (p: string) => {
+      promptVisto = p;
+      return JSON.stringify({
+        accion: "gasto",
+        propuesta: { nombre: "Comida", importe: 40, categoria: "Comida", tipo: "Gasto Variable", fecha: "2026-06-23", estado: "Pending" },
+        nota: "",
+      });
+    };
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+      accion: string;
+      propuesta: { importe: number } | null;
+    };
+    expect(promptVisto).toContain("Balance global"); // snapshot financiero
+    expect(promptVisto).toContain("id:pg1 | Luz"); // lista de pendientes
+    expect(res.accion).toBe("gasto");
+    expect(res.propuesta?.importe).toBe(40);
+  });
+
+  it("asistente: puede pedir aclaración con opciones tipadas", async () => {
+    const j = job({ tipo: "asistente", payload: { mensaje: "ya pagué la luz" } });
+    const invocar = async () =>
+      JSON.stringify({
+        accion: "aclarar",
+        pregunta: "¿Gasto nuevo o marcar la luz como pagada?",
+        opciones: [
+          { etiqueta: "Registrar gasto nuevo", accion: "gasto" },
+          { etiqueta: "Marcar la luz como pagada", accion: "pagado" },
+        ],
+      });
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+      accion: string;
+      opciones: { accion: string }[];
+    };
+    expect(res.accion).toBe("aclarar");
+    expect(res.opciones).toHaveLength(2);
+    expect(res.opciones[0]!.accion).toBe("gasto");
+  });
+
+  it("asistente: rechaza una opción de aclarar con acción inválida (Zod)", async () => {
+    const j = job({ tipo: "asistente", payload: { mensaje: "x" } });
+    const invocar = async () =>
+      JSON.stringify({
+        accion: "aclarar",
+        pregunta: "¿?",
+        opciones: [{ etiqueta: "Algo raro", accion: "borrar_todo" }],
+      });
+    await expect(ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })).rejects.toThrow();
   });
 
   it("proponer_contexto: acepta JSON con fences y borradores", async () => {

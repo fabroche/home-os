@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Sparkles } from "lucide-react";
 import {
+  enviarAlAsistente,
   preguntarAsistente,
   proponerContexto,
   registrarGasto,
@@ -11,67 +12,38 @@ import {
   registrarDeuda,
   marcarPagado,
   consultarJob,
+  type EncolarResult,
 } from "@/lib/actions/ai";
 import { ChatPanel } from "@/components/asistente/chat-panel";
 import type { ChatMsg } from "@/components/asistente/chat-message";
+import type { AccionAsistente } from "@/types/ai";
 
 const STORAGE_KEY = "homeos.chat.v1";
 
 /**
- * Burbuja de chat del Asistente (M6 · F-M6-5/6). FAB flotante que abre el panel;
- * según la intención encola `consulta_rag` (preguntar) o `proponer_contexto`
- * (enseñar), y **sondea** el resultado. En móvil el FAB va encima de la bottom nav.
- * `pollMs`/`maxIntentos` inyectables para tests. (Respuesta por polling; Realtime luego.)
+ * Burbuja de chat del Asistente (M6 · F-M6-5/6). FAB flotante que abre el panel; encola
+ * cada mensaje en el **router** (`asistente`), que clasifica la intención con el modelo
+ * (responder/registrar/…/aclarar) y **sondea** el resultado. Cuando el router pide aclarar,
+ * elegir una opción reenvía el mensaje FORZANDO esa acción (vía las acciones dedicadas).
+ * En móvil el FAB va encima de la bottom nav. `pollMs`/`maxIntentos` inyectables para tests.
  */
 
-export type Intencion = "preguntar" | "ensenar" | "gasto" | "ingreso" | "deuda" | "pagado";
-
-/**
- * Heurística MVP de intención (a reemplazar por clasificación del modelo). El orden
- * importa: las acciones se detectan antes que pregunta/enseñar, y se evita confundir
- * preguntas-insight ("¿en qué gasto más?", "¿a quién le debo más?") con acciones
- * (exigen imperativo o un importe).
- */
-export function detectarIntencion(texto: string): Intencion {
-  const t = texto.toLowerCase();
-
-  // Marcar pagado: referencia a algo existente + "pagado" (no confundir con "pagué 40").
-  if (/\bpagad[oa]s?\b/.test(t) && /(marca|m[aá]rca|marcar|ya )/.test(t)) return "pagado";
-
-  // Deuda/pago a una persona: préstamo, alta explícita, o deber/deber-importe.
-  if (
-    /\b(prest[eé]|prest[oó]|pr[eé]stamo)(?![a-záéíóúñ])/.test(t) ||
-    /(reg[ií]stra|ap[uú]nta|an[oó]ta).{0,30}\b(deuda|pago)\b/.test(t) ||
-    /\bdeb[oe]\b.{0,25}\d/.test(t)
-  ) {
-    return "deuda";
+/** Encola la acción concreta correspondiente a una opción de desambiguación. */
+function encolarAccion(mensaje: string, accion: AccionAsistente): Promise<EncolarResult> {
+  switch (accion) {
+    case "gasto":
+      return registrarGasto({ peticion: mensaje });
+    case "ingreso":
+      return registrarIngreso({ peticion: mensaje });
+    case "deuda":
+      return registrarDeuda({ peticion: mensaje });
+    case "pagado":
+      return marcarPagado({ peticion: mensaje });
+    case "contexto":
+      return proponerContexto({ peticion: mensaje });
+    case "responder":
+      return preguntarAsistente({ pregunta: mensaje });
   }
-
-  // Ingreso: imperativo + ingreso/salario/nómina, o verbo de cobro con importe.
-  if (
-    /(reg[ií]stra(r|me)?|ap[uú]nta(r|me)?|an[oó]ta(r|me)?|a[ñn]ade|mete).{0,25}\b(ingreso|salario|n[oó]mina)\b/.test(t) ||
-    // sin \b final: en JS \b no marca frontera tras vocal acentuada (cobré, recibí…)
-    /\b(cobr[eé]|recib[ií]|me pagaron|me ingresaron|gan[eé])(?![a-záéíóúñ]).{0,25}\d/.test(t)
-  ) {
-    return "ingreso";
-  }
-
-  // Gasto: imperativo + "gasto", o gasto ya hecho. "¿en qué gasto más?" NO matchea.
-  if (
-    /(reg[ií]stra(r|me|á)?|an[oó]ta(r|me)?|ap[uú]nta(r|me)?|a[ñn]ade|mete|crea(r|me)?).{0,25}\bgasto\b/.test(t) ||
-    /\b(gast[eé]|pagu[eé]|compr[eé])(?![a-záéíóúñ])/.test(t) // sin \b final por las vocales acentuadas
-  ) {
-    return "gasto";
-  }
-
-  if (
-    /\b(recu[eé]rdame|an[oó]tame|reg[ií]stra|registr[aá]|guarda(r)? (esto|esta|en (el )?contexto)|crea(r|á)? (una |la )?(regla|nota|preferencia|entrada))\b/.test(
-      t,
-    )
-  ) {
-    return "ensenar";
-  }
-  return "preguntar";
 }
 
 export function ChatBubble({
@@ -215,6 +187,24 @@ export function ChatBubble({
                 { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", movimientoPagar: mov },
               ]);
             }
+          } else if (st.tipo === "aclarar") {
+            const { pregunta, opciones } = st;
+            // El mensaje original quedó guardado en el bubble pendiente (`mensajeOrigen`); lo
+            // recuperamos para que la tarjeta pueda reenviarlo forzando la acción elegida.
+            setMessages((ms) => {
+              const origen = ms.find((m) => m.id === aMsgId)?.mensajeOrigen ?? "";
+              return [
+                ...ms.map((m) =>
+                  m.id === aMsgId ? { ...m, contenido: pregunta, pendiente: false, jobId: undefined } : m,
+                ),
+                {
+                  id: crypto.randomUUID(),
+                  rol: "assistant" as const,
+                  contenido: "",
+                  aclarar: { pregunta, opciones, mensaje: origen },
+                },
+              ];
+            });
           } else {
             actualizar(aMsgId, {
               contenido: st.respuesta,
@@ -260,36 +250,45 @@ export function ChatBubble({
     }
   }, [messages, open, pollJob]);
 
-  async function onSend(texto: string) {
-    const intencion = detectarIntencion(texto);
-    const userMsgId = crypto.randomUUID();
-    const aMsgId = crypto.randomUUID();
-    setMessages((ms) => [
-      ...ms,
-      { id: userMsgId, rol: "user", contenido: texto },
-      { id: aMsgId, rol: "assistant", contenido: "", pendiente: true },
-    ]);
+  // Crea el bubble del asistente pendiente, encola el job y le asigna su jobId (el efecto
+  // de arriba arranca/reanuda el polling). `userMsg` añade el mensaje del usuario; en la
+  // ruta del router se guarda `mensajeOrigen` para que "aclarar" pueda reenviarlo.
+  const lanzarJob = useCallback(
+    async (
+      encolar: () => Promise<EncolarResult>,
+      opts: { userMsg?: string; mensajeOrigen?: string } = {},
+    ) => {
+      const aMsgId = crypto.randomUUID();
+      setMessages((ms) => [
+        ...ms,
+        ...(opts.userMsg ? [{ id: crypto.randomUUID(), rol: "user" as const, contenido: opts.userMsg }] : []),
+        { id: aMsgId, rol: "assistant" as const, contenido: "", pendiente: true, mensajeOrigen: opts.mensajeOrigen },
+      ]);
+      const res = await encolar();
+      if (!res.ok) {
+        actualizar(aMsgId, { contenido: res.error, pendiente: false });
+        return;
+      }
+      actualizar(aMsgId, { jobId: res.jobId });
+    },
+    [actualizar],
+  );
 
-    const res =
-      intencion === "gasto"
-        ? await registrarGasto({ peticion: texto })
-        : intencion === "ingreso"
-          ? await registrarIngreso({ peticion: texto })
-          : intencion === "deuda"
-            ? await registrarDeuda({ peticion: texto })
-            : intencion === "pagado"
-              ? await marcarPagado({ peticion: texto })
-              : intencion === "ensenar"
-                ? await proponerContexto({ peticion: texto })
-                : await preguntarAsistente({ pregunta: texto });
-    if (!res.ok) {
-      actualizar(aMsgId, { contenido: res.error, pendiente: false });
-      return;
-    }
-    // Guarda el jobId en el mensaje: el efecto de arriba arranca el polling y, si la
-    // pestaña se recarga, lo reanuda en vez de perder la respuesta del worker.
-    actualizar(aMsgId, { jobId: res.jobId });
-  }
+  // Todo mensaje va al router: el modelo clasifica la intención (o pide aclarar).
+  const onSend = useCallback(
+    (texto: string) => {
+      void lanzarJob(() => enviarAlAsistente({ mensaje: texto }), { userMsg: texto, mensajeOrigen: texto });
+    },
+    [lanzarJob],
+  );
+
+  // Elegir una opción de desambiguación: reenvía el mensaje original FORZANDO la acción.
+  const onElegirAccion = useCallback(
+    (mensaje: string, accion: AccionAsistente) => {
+      void lanzarJob(() => encolarAccion(mensaje, accion));
+    },
+    [lanzarJob],
+  );
 
   return (
     <>
@@ -320,6 +319,7 @@ export function ChatBubble({
             messages={messages}
             pending={pending}
             onSend={onSend}
+            onElegirAccion={onElegirAccion}
             onClose={() => setOpen(false)}
           />
         )}
