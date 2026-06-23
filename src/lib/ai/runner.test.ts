@@ -10,12 +10,14 @@ import type { FragmentoContexto } from "@/types/contexto";
 
 const tomarSiguienteMock = vi.fn();
 const marcarMock = vi.fn();
+const reintentarMock = vi.fn();
 vi.mock("@/lib/ai/jobs", () => ({
   tomarSiguiente: (...a: unknown[]) => tomarSiguienteMock(...a),
   marcar: (...a: unknown[]) => marcarMock(...a),
+  reintentar: (...a: unknown[]) => reintentarMock(...a),
 }));
 
-import { construirPrompt, extraerJson, ejecutarJob, drenarCola } from "@/lib/ai/runner";
+import { construirPrompt, extraerJson, ejecutarJob, drenarCola, backoffMs } from "@/lib/ai/runner";
 
 const job = (over: Partial<AiJob> = {}): AiJob => ({
   id: "j1",
@@ -45,6 +47,7 @@ const listar = async () => [fragmento];
 beforeEach(() => {
   tomarSiguienteMock.mockReset();
   marcarMock.mockReset();
+  reintentarMock.mockReset();
 });
 
 describe("construirPrompt", () => {
@@ -91,12 +94,21 @@ describe("ejecutarJob", () => {
   });
 });
 
+describe("backoffMs", () => {
+  it("crece exponencialmente con tope", () => {
+    expect(backoffMs(1, 2000)).toBe(2000);
+    expect(backoffMs(2, 2000)).toBe(4000);
+    expect(backoffMs(3, 2000)).toBe(8000);
+    expect(backoffMs(99, 2000, 60000)).toBe(60000); // tope
+  });
+});
+
 describe("drenarCola", () => {
   it("procesa un job y lo cierra como ok", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job()).mockResolvedValueOnce(null);
     const invocar = async () => JSON.stringify({ respuesta: "ok", fuentes: [] });
-    const n = await drenarCola({ invocar, recuperar, listar });
-    expect(n).toBe(1);
+    const r = await drenarCola({ invocar, recuperar, listar });
+    expect(r).toMatchObject({ procesados: 1, ok: 1, reintentos: 0, errores: 0 });
     expect(marcarMock).toHaveBeenCalledWith(
       "j1",
       "ok",
@@ -104,10 +116,21 @@ describe("drenarCola", () => {
     );
   });
 
-  it("marca error (reintentable) si la salida es inválida", async () => {
-    tomarSiguienteMock.mockResolvedValueOnce(job()).mockResolvedValueOnce(null);
+  it("re-encola (backoff) si falla y quedan intentos", async () => {
+    tomarSiguienteMock.mockResolvedValueOnce(job({ intentos: 1 })).mockResolvedValueOnce(null);
     const invocar = async () => "{ esto no es json";
-    await drenarCola({ invocar, recuperar, listar });
+    const r = await drenarCola({ invocar, recuperar, listar }, 3);
+    expect(r.reintentos).toBe(1);
+    expect(reintentarMock).toHaveBeenCalledWith("j1", expect.any(Number), expect.any(String));
+    expect(marcarMock).not.toHaveBeenCalled();
+  });
+
+  it("marca error terminal al agotar los intentos", async () => {
+    tomarSiguienteMock.mockResolvedValueOnce(job({ intentos: 3 })).mockResolvedValueOnce(null);
+    const invocar = async () => "{ esto no es json";
+    const r = await drenarCola({ invocar, recuperar, listar }, 3);
+    expect(r.errores).toBe(1);
     expect(marcarMock).toHaveBeenCalledWith("j1", "error", expect.objectContaining({ error: expect.any(String) }));
+    expect(reintentarMock).not.toHaveBeenCalled();
   });
 });

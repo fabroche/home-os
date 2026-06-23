@@ -2,7 +2,7 @@ import "@/lib/server-guard";
 import { spawn } from "node:child_process";
 import { env } from "@/config/env";
 import { recuperarContexto, listarContexto } from "@/lib/ai/context/retrieve";
-import { tomarSiguiente, marcar } from "@/lib/ai/jobs";
+import { tomarSiguiente, marcar, reintentar } from "@/lib/ai/jobs";
 import { JOB_OUTPUT_SCHEMAS, type AiJob } from "@/types/ai";
 import type { FragmentoContexto } from "@/types/contexto";
 
@@ -125,20 +125,42 @@ export async function ejecutarJob(job: AiJob, deps: RunnerDeps = defaultDeps): P
   return schema.parse(extraerJson(raw)); // ZodError ⇒ el job se marca error (reintentable)
 }
 
-/** Drena la cola: toma jobs hasta vaciarla; cierra cada uno ok|error. Devuelve cuántos procesó. */
-export async function drenarCola(deps: Partial<RunnerDeps> = {}): Promise<number> {
+/** Backoff exponencial con tope (puro): intento 1→base, 2→2×base, … */
+export function backoffMs(intentos: number, baseMs = 2000, capMs = 60000): number {
+  return Math.min(capMs, baseMs * 2 ** Math.max(0, intentos - 1));
+}
+
+export type ResumenDrain = { procesados: number; ok: number; reintentos: number; errores: number };
+
+/**
+ * Drena la cola: toma jobs listos hasta vaciarla. Cada job: ok, o si falla y aún
+ * quedan intentos → re-encola con backoff (reintentable), o error terminal. Los
+ * re-encolados no se vuelven a tomar en esta pasada (su next_attempt_at es futuro).
+ */
+export async function drenarCola(
+  deps: Partial<RunnerDeps> = {},
+  maxReintentos = 3,
+): Promise<ResumenDrain> {
   const d = { ...defaultDeps, ...deps };
-  let procesados = 0;
+  const resumen: ResumenDrain = { procesados: 0, ok: 0, reintentos: 0, errores: 0 };
   for (;;) {
     const job = await tomarSiguiente();
     if (!job) break;
+    resumen.procesados++;
     try {
       const resultado = await ejecutarJob(job, d);
       await marcar(job.id, "ok", { resultado });
+      resumen.ok++;
     } catch (e) {
-      await marcar(job.id, "error", { error: e instanceof Error ? e.message : String(e) });
+      const msg = e instanceof Error ? e.message : String(e);
+      if (job.intentos < maxReintentos) {
+        await reintentar(job.id, backoffMs(job.intentos), msg);
+        resumen.reintentos++;
+      } else {
+        await marcar(job.id, "error", { error: msg });
+        resumen.errores++;
+      }
     }
-    procesados++;
   }
-  return procesados;
+  return resumen;
 }
