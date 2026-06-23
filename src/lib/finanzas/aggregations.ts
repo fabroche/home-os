@@ -26,17 +26,27 @@ export function resumen(movs: Movimiento[]): ResumenFinanzas {
 
 export type CategoriaTotal = { categoria: string; total: number };
 
-/** Gastos (magnitud) agrupados por categoría, de mayor a menor. */
-export function gastosPorCategoria(movs: Movimiento[]): CategoriaTotal[] {
+/** Agrupa la magnitud por categoría para un flujo dado, de mayor a menor. */
+function agruparPorCategoria(movs: Movimiento[], flujo: Movimiento["flujo"]): CategoriaTotal[] {
   const acc = new Map<string, number>();
   for (const m of movs) {
-    if (m.flujo !== "gasto") continue;
+    if (m.flujo !== flujo) continue;
     const cat = m.categoria ?? "Sin categoría";
     acc.set(cat, (acc.get(cat) ?? 0) + Math.abs(m.importe ?? 0));
   }
   return [...acc.entries()]
     .map(([categoria, total]) => ({ categoria, total }))
     .sort((a, b) => b.total - a.total);
+}
+
+/** Gastos (magnitud) agrupados por categoría, de mayor a menor. */
+export function gastosPorCategoria(movs: Movimiento[]): CategoriaTotal[] {
+  return agruparPorCategoria(movs, "gasto");
+}
+
+/** Ingresos (magnitud) agrupados por categoría/fuente, de mayor a menor. */
+export function ingresosPorCategoria(movs: Movimiento[]): CategoriaTotal[] {
+  return agruparPorCategoria(movs, "ingreso");
 }
 
 export type MesResumen = { mes: string; ingresos: number; gastos: number; balance: number };

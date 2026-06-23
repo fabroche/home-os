@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Sparkles } from "lucide-react";
-import { preguntarAsistente, proponerContexto, consultarJob } from "@/lib/actions/ai";
+import { preguntarAsistente, proponerContexto, registrarGasto, consultarJob } from "@/lib/actions/ai";
 import { ChatPanel } from "@/components/asistente/chat-panel";
 import type { ChatMsg } from "@/components/asistente/chat-message";
 
@@ -17,8 +17,17 @@ const STORAGE_KEY = "homeos.chat.v1";
  */
 
 /** Heurística MVP de intención (a reemplazar por clasificación del modelo). */
-export function detectarIntencion(texto: string): "preguntar" | "ensenar" {
+export function detectarIntencion(texto: string): "preguntar" | "ensenar" | "gasto" {
   const t = texto.toLowerCase();
+  // Gasto PRIMERO: "regístrame un gasto…" comparte verbo con "enseñar", así que se
+  // prioriza. Requiere un verbo imperativo + "gasto", o un gasto ya hecho (gasté/pagué/
+  // compré). "¿en qué gasto más?" NO matchea (es pregunta, no acción).
+  if (
+    /(reg[ií]stra(r|me|á)?|an[oó]ta(r|me)?|ap[uú]nta(r|me)?|a[ñn]ade|mete|crea(r|me)?).{0,25}\bgasto\b/.test(t) ||
+    /\b(gast[eé]|pagu[eé]|compr[eé])\b/.test(t)
+  ) {
+    return "gasto";
+  }
   if (
     /\b(recu[eé]rdame|an[oó]tame|reg[ií]stra|registr[aá]|guarda(r)? (esto|esta|en (el )?contexto)|crea(r|á)? (una |la )?(regla|nota|preferencia|entrada))\b/.test(
       t,
@@ -124,6 +133,21 @@ export function ChatBubble({
                 })),
               ]);
             }
+          } else if (st.tipo === "registrar_gasto") {
+            const prop = st.propuesta;
+            actualizar(aMsgId, {
+              contenido: prop
+                ? "Te propongo registrar este gasto:"
+                : st.nota || "No pude sacar el gasto. ¿Me dices el importe?",
+              pendiente: false,
+              jobId: undefined,
+            });
+            if (prop) {
+              setMessages((ms) => [
+                ...ms,
+                { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", propuestaGasto: prop },
+              ]);
+            }
           } else {
             actualizar(aMsgId, {
               contenido: st.respuesta,
@@ -180,9 +204,11 @@ export function ChatBubble({
     ]);
 
     const res =
-      intencion === "ensenar"
-        ? await proponerContexto({ peticion: texto })
-        : await preguntarAsistente({ pregunta: texto });
+      intencion === "gasto"
+        ? await registrarGasto({ peticion: texto })
+        : intencion === "ensenar"
+          ? await proponerContexto({ peticion: texto })
+          : await preguntarAsistente({ pregunta: texto });
     if (!res.ok) {
       actualizar(aMsgId, { contenido: res.error, pendiente: false });
       return;
