@@ -3,14 +3,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
-const preguntar = vi.fn();
-const proponer = vi.fn();
+const enviar = vi.fn();
 const registrar = vi.fn();
 const consultar = vi.fn();
 vi.mock("@/lib/actions/ai", () => ({
-  preguntarAsistente: (...a: unknown[]) => preguntar(...a),
-  proponerContexto: (...a: unknown[]) => proponer(...a),
+  enviarAlAsistente: (...a: unknown[]) => enviar(...a),
+  // Acciones dedicadas (las usa la desambiguación al elegir una opción).
   registrarGasto: (...a: unknown[]) => registrar(...a),
+  preguntarAsistente: vi.fn(),
+  proponerContexto: vi.fn(),
   registrarIngreso: vi.fn(),
   registrarDeuda: vi.fn(),
   marcarPagado: vi.fn(),
@@ -24,33 +25,13 @@ vi.mock("@/lib/actions/finanzas", () => ({
   cambiarEstadoMovimiento: vi.fn(),
 }));
 
-import { ChatBubble, detectarIntencion } from "@/components/asistente/chat-bubble";
+import { ChatBubble } from "@/components/asistente/chat-bubble";
 
 beforeEach(() => {
-  preguntar.mockReset();
-  proponer.mockReset();
+  enviar.mockReset();
   registrar.mockReset();
   consultar.mockReset();
   sessionStorage.clear();
-});
-
-describe("detectarIntencion", () => {
-  it("distingue acciones de preguntas-insight", () => {
-    // Acciones
-    expect(detectarIntencion("apúntame un gasto de 40€ en comida")).toBe("gasto");
-    expect(detectarIntencion("gasté 12 en el bar")).toBe("gasto");
-    expect(detectarIntencion("registra mi salario de 1500€")).toBe("ingreso");
-    expect(detectarIntencion("cobré 200 de un cliente")).toBe("ingreso");
-    expect(detectarIntencion("le presté 50 a Leo")).toBe("deuda");
-    expect(detectarIntencion("le debo 30 a Guille")).toBe("deuda");
-    expect(detectarIntencion("marca como pagada la luz")).toBe("pagado");
-    // Preguntas-insight (NO deben dispararse como acción)
-    expect(detectarIntencion("¿en qué gasto más?")).toBe("preguntar");
-    expect(detectarIntencion("¿a quién le debo más?")).toBe("preguntar");
-    expect(detectarIntencion("¿cuál es mi ingreso principal?")).toBe("preguntar");
-    // Enseñar contexto
-    expect(detectarIntencion("recuérdame que Naturgy es mi proveedor de gas")).toBe("ensenar");
-  });
 });
 
 describe("ChatBubble", () => {
@@ -60,10 +41,11 @@ describe("ChatBubble", () => {
     expect(screen.getByLabelText("Mensaje para el asistente")).toBeInTheDocument();
   });
 
-  it("encola la pregunta, sondea y muestra la respuesta con fuentes", async () => {
-    preguntar.mockResolvedValue({ ok: true, jobId: "j1" });
+  it("manda el mensaje al router, sondea y muestra la respuesta con fuentes", async () => {
+    enviar.mockResolvedValue({ ok: true, jobId: "j1" });
     consultar.mockResolvedValue({
       estado: "ok",
+      tipo: "consulta_rag",
       respuesta: "En mayo gastaste 420 €.",
       fuentes: [{ id: "c1", titulo: "12 movimientos" }],
     });
@@ -77,33 +59,11 @@ describe("ChatBubble", () => {
     expect(screen.getByText("¿gasto de mayo?")).toBeInTheDocument(); // mensaje optimista
     await waitFor(() => expect(screen.getByText("En mayo gastaste 420 €.")).toBeInTheDocument());
     expect(screen.getByText(/12 movimientos/)).toBeInTheDocument();
-    expect(preguntar).toHaveBeenCalledWith({ pregunta: "¿gasto de mayo?" });
+    expect(enviar).toHaveBeenCalledWith({ mensaje: "¿gasto de mayo?" });
   });
 
-  it("intención de enseñar: propone y muestra la tarjeta de sugerencia", async () => {
-    proponer.mockResolvedValue({ ok: true, jobId: "j3" });
-    consultar.mockResolvedValue({
-      estado: "ok",
-      tipo: "proponer_contexto",
-      borradores: [
-        { tipo: "proveedor", titulo: "Naturgy", contenido: "Compañía de gas", tags: ["gas"] },
-      ],
-    });
-
-    render(<ChatBubble defaultOpen pollMs={5} />);
-    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
-      target: { value: "recuérdame que Naturgy es mi proveedor de gas" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
-
-    await waitFor(() => expect(screen.getByText(/sugerencia de contexto/i)).toBeInTheDocument());
-    expect(screen.getByText("Naturgy")).toBeInTheDocument();
-    expect(proponer).toHaveBeenCalled();
-    expect(preguntar).not.toHaveBeenCalled();
-  });
-
-  it("intención de gasto: propone y muestra la tarjeta de acción", async () => {
-    registrar.mockResolvedValue({ ok: true, jobId: "jg" });
+  it("el router propone un gasto y muestra la tarjeta de acción", async () => {
+    enviar.mockResolvedValue({ ok: true, jobId: "jg" });
     consultar.mockResolvedValue({
       estado: "ok",
       tipo: "registrar_gasto",
@@ -125,12 +85,58 @@ describe("ChatBubble", () => {
 
     await waitFor(() => expect(screen.getByText(/registrar gasto/i)).toBeInTheDocument());
     expect(screen.getByDisplayValue("Café")).toBeInTheDocument();
-    expect(registrar).toHaveBeenCalledWith({ peticion: "apúntame un gasto de 2,5€ en café" });
-    expect(preguntar).not.toHaveBeenCalled();
+    expect(enviar).toHaveBeenCalledWith({ mensaje: "apúntame un gasto de 2,5€ en café" });
+  });
+
+  it("desambigua: muestra las opciones y al elegir una encola la acción forzada", async () => {
+    enviar.mockResolvedValue({ ok: true, jobId: "jr" });
+    registrar.mockResolvedValue({ ok: true, jobId: "jg" });
+    // 1ª respuesta del router: pide aclarar. Tras elegir "gasto", el job forzado propone.
+    consultar
+      .mockResolvedValueOnce({
+        estado: "ok",
+        tipo: "aclarar",
+        pregunta: "¿Registrar un gasto nuevo o marcar la luz como pagada?",
+        opciones: [
+          { etiqueta: "Registrar gasto nuevo", accion: "gasto" },
+          { etiqueta: "Marcar la luz como pagada", accion: "pagado" },
+        ],
+      })
+      .mockResolvedValue({
+        estado: "ok",
+        tipo: "registrar_gasto",
+        propuesta: {
+          nombre: "Luz",
+          importe: 50,
+          categoria: "Casa",
+          tipo: "Gasto Variable",
+          fecha: "2026-06-23",
+          estado: "Pending",
+        },
+      });
+
+    render(<ChatBubble defaultOpen pollMs={5} />);
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
+      target: { value: "ya pagué la luz" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    // Aparece la tarjeta de desambiguación con sus opciones.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /registrar gasto nuevo/i })).toBeInTheDocument(),
+    );
+    expect(enviar).toHaveBeenCalledWith({ mensaje: "ya pagué la luz" });
+
+    // Elegir "gasto" reenvía el mensaje ORIGINAL forzando registrarGasto.
+    fireEvent.click(screen.getByRole("button", { name: /registrar gasto nuevo/i }));
+    expect(registrar).toHaveBeenCalledWith({ peticion: "ya pagué la luz" });
+
+    // Y se pinta la tarjeta de gasto propuesta por el job forzado.
+    await waitFor(() => expect(screen.getByDisplayValue("Luz")).toBeInTheDocument());
   });
 
   it("conserva el historial tras desmontar (persistencia)", async () => {
-    preguntar.mockResolvedValue({ ok: true, jobId: "j1" });
+    enviar.mockResolvedValue({ ok: true, jobId: "j1" });
     consultar.mockResolvedValue({ estado: "ok", tipo: "consulta_rag", respuesta: "Balance: 100 €", fuentes: [] });
 
     const { unmount } = render(<ChatBubble defaultOpen pollMs={5} />);
@@ -148,7 +154,7 @@ describe("ChatBubble", () => {
   });
 
   it("muestra el error si el job falla", async () => {
-    preguntar.mockResolvedValue({ ok: true, jobId: "j2" });
+    enviar.mockResolvedValue({ ok: true, jobId: "j2" });
     consultar.mockResolvedValue({ estado: "error", error: "salida no válida" });
 
     render(<ChatBubble defaultOpen pollMs={5} />);

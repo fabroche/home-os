@@ -8,8 +8,10 @@ import { SuggestionCard } from "@/components/asistente/suggestion-card";
 import { ActionCard } from "@/components/asistente/action-card";
 import { DeudaCard } from "@/components/asistente/deuda-card";
 import { MarcarPagadoCard } from "@/components/asistente/marcar-pagado-card";
+import { AclararCard } from "@/components/asistente/aclarar-card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import type { AccionAsistente } from "@/types/ai";
 
 /**
  * Panel del asistente (presentacional). En móvil ocupa casi toda la pantalla
@@ -20,11 +22,13 @@ export function ChatPanel({
   messages,
   pending,
   onSend,
+  onElegirAccion,
   onClose,
 }: {
   messages: ChatMsg[];
   pending: boolean;
   onSend: (texto: string) => void;
+  onElegirAccion?: (mensaje: string, accion: AccionAsistente) => void;
   onClose: () => void;
 }) {
   const [texto, setTexto] = useState("");
@@ -86,6 +90,8 @@ export function ChatPanel({
               <DeudaCard key={m.id} propuesta={m.propuestaDeuda} />
             ) : m.movimientoPagar ? (
               <MarcarPagadoCard key={m.id} movimiento={m.movimientoPagar} />
+            ) : m.aclarar ? (
+              <AclararCard key={m.id} aclarar={m.aclarar} onElegir={onElegirAccion} />
             ) : (
               <ChatMessage key={m.id} msg={m} />
             ),

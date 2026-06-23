@@ -14,8 +14,11 @@ import {
   RegistrarDeudaOutputSchema,
   MarcarPagadoPayloadSchema,
   MarcarPagadoOutputSchema,
+  AsistentePayloadSchema,
+  AsistenteOutputSchema,
   type MarcarPagadoOutput,
   type BorradorContexto,
+  type AccionAsistente,
 } from "@/types/ai";
 import type { CrearMovimientoInput, CrearDeudaInput } from "@/types/finanzas";
 
@@ -114,6 +117,23 @@ export async function marcarPagado(input: unknown): Promise<EncolarResult> {
   }
 }
 
+/**
+ * Encola un mensaje en lenguaje natural para el **router** del asistente (`asistente`).
+ * El modelo clasifica la intención y propone (o pide aclaración) en una sola pasada;
+ * sustituye a la heurística de intención del cliente.
+ */
+export async function enviarAlAsistente(input: unknown): Promise<EncolarResult> {
+  const parsed = AsistentePayloadSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Escribe un mensaje." };
+  try {
+    const user = await requireUser();
+    const job = await encolar(user.id, "asistente", parsed.data);
+    return { ok: true, jobId: job.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al consultar." };
+  }
+}
+
 export type JobEstado =
   | { estado: "pendiente" | "ejecutando" | "desconocido" }
   | { estado: "ok"; tipo: "consulta_rag"; respuesta: string; fuentes: { id: string; titulo: string }[] }
@@ -122,6 +142,7 @@ export type JobEstado =
   | { estado: "ok"; tipo: "registrar_ingreso"; propuesta: CrearMovimientoInput | null; nota?: string }
   | { estado: "ok"; tipo: "registrar_deuda"; propuestaDeuda: CrearDeudaInput | null; nota?: string }
   | { estado: "ok"; tipo: "marcar_pagado"; movimiento: MarcarPagadoOutput["movimiento"]; nota?: string }
+  | { estado: "ok"; tipo: "aclarar"; pregunta: string; opciones: { etiqueta: string; accion: AccionAsistente }[] }
   | { estado: "error"; error: string };
 
 /** Sondea el estado/resultado de un job propio (lo llama el polling de la burbuja). */
@@ -151,6 +172,29 @@ export async function consultarJob(jobId: string): Promise<JobEstado> {
         const out = MarcarPagadoOutputSchema.safeParse(job.resultado);
         if (!out.success) return { estado: "error", error: "No pude identificar el gasto." };
         return { estado: "ok", tipo: "marcar_pagado", movimiento: out.data.movimiento, nota: out.data.nota };
+      }
+      if (job.tipo === "asistente") {
+        // El router devuelve una salida discriminada; la mapeamos a los MISMOS estados
+        // que ya sabe pintar la burbuja (así cada tarjeta se reutiliza tal cual) + "aclarar".
+        const out = AsistenteOutputSchema.safeParse(job.resultado);
+        if (!out.success) return { estado: "error", error: "Respuesta del asistente no válida." };
+        const d = out.data;
+        switch (d.accion) {
+          case "responder":
+            return { estado: "ok", tipo: "consulta_rag", respuesta: d.respuesta, fuentes: d.fuentes };
+          case "gasto":
+            return { estado: "ok", tipo: "registrar_gasto", propuesta: d.propuesta, nota: d.nota };
+          case "ingreso":
+            return { estado: "ok", tipo: "registrar_ingreso", propuesta: d.propuesta, nota: d.nota };
+          case "deuda":
+            return { estado: "ok", tipo: "registrar_deuda", propuestaDeuda: d.propuesta, nota: d.nota };
+          case "pagado":
+            return { estado: "ok", tipo: "marcar_pagado", movimiento: d.movimiento, nota: d.nota };
+          case "contexto":
+            return { estado: "ok", tipo: "proponer_contexto", borradores: d.borradores };
+          case "aclarar":
+            return { estado: "ok", tipo: "aclarar", pregunta: d.pregunta, opciones: d.opciones };
+        }
       }
       const out = ConsultaRagOutputSchema.safeParse(job.resultado);
       if (!out.success) return { estado: "error", error: "Respuesta no válida." };
