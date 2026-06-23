@@ -64,9 +64,9 @@ La app encola tareas en `ai_jobs` (Supabase) y el `worker` las drena con el runn
 | M6 | Asistente IA (jobs headless) |
 | M7 | Auth & seguridad (single-user) |
 
-## Estado actual (2026-06-22) — EN PRODUCCIÓN
+## Estado actual (2026-06-23) — EN PRODUCCIÓN
 Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **worker** (sync 24/7) +
-**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 141 tests verdes.
+**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 181 tests verdes.
 
 **Implementado:**
 - **T1 · Capa Notion** (`src/lib/notion/`): client (fetch nativo undici — el `node-fetch@2` del SDK fallaba
@@ -85,6 +85,13 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
 - **M4 · Banco de contexto**: CRUD de entradas tipadas (tags + vigencia + estado) y recuperación selectiva
   por tipo/tag/vigencia + FTS Postgres (sin embeddings, D7). Migración `0002_contexto.sql` **aplicada**
   (incluye la función SQL `recuperar_contexto`). UI en `/contexto`.
+- **M6 · Asistente IA (MVP)**: cola `ai_jobs` (claim atómico `tomar_ai_job` con SKIP LOCKED) + **runner
+  headless** (`claude -p --output-format json`, contexto M4, **salida validada con Zod**, reintentos con
+  backoff). **Burbuja de chat** (FAB + sheet móvil/tarjeta desktop, polling) sobre `consulta_rag`, y
+  **proponer contexto** (`proponer_contexto` → `SuggestionCard` con Revisar y publicar / Guardar borrador /
+  Descartar). **Gobernanza M4↔M6:** decide solo con publicado, escribe solo borradores, publicar = usuario.
+  Migraciones `0005`/`0006`. Auth runner por `CLAUDE_CODE_OAUTH_TOKEN`. Engine-agnóstico (deps inyectables).
+  **Pendiente (Fase 5):** rotación de token in-app cifrada + banner de estado; observabilidad en dashboard.
 - **T5 · Sistema de diseño**: identidad editorial (Inter Tight + Instrument Serif italic, marca violeta
   `#4928fd`, light+dark con next-themes, motion discreto). Primitivas en `src/components/{ui,theme,motion}`.
   Header persistente (grupo `(dashboard)`) + **loading skeletons a medida**. **Storybook 10** (stories + a11y +
@@ -95,8 +102,8 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
 Los prerequisitos manuales de la escritura M1 (capacidades Insert/Update en Notion, columna `comprobante`,
 `NOTION_API_KEY` en la app, migración `0003`) están **completados** y la escritura funciona en prod.
 
-**Roadmap:** SMTP/correo + DNS; **M6** (asistente IA, consume M4), luego **M3** (correo) y **M2** (calendario);
-**M5** (dashboard). Orden por dependencias: M4✓ → M6 → M3/M2 → M5.
+**Roadmap:** **M6 MVP ✓** (falta Fase 5: rotación token in-app + observabilidad); SMTP/correo + DNS;
+luego **M3** (correo) y **M2** (calendario); **M5** (dashboard). Orden por dependencias: M4✓ → M6✓(MVP) → M3/M2 → M5.
 **Backlog M1 (sugerencias):** filtro por mes/rango de fechas y exportar CSV en movimientos; conciliación
 factura↔gasto (M3/M6). Ver `docs/modules/M1-finanzas.md`.
 

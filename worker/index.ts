@@ -29,8 +29,12 @@ async function runDrain() {
   draining = true;
   try {
     const { drenarCola } = await import("@/lib/ai/runner");
-    const n = await drenarCola();
-    if (n > 0) console.warn(`[worker] ai_jobs procesados: ${n}`);
+    const r = await drenarCola();
+    if (r.procesados > 0) {
+      console.warn(
+        `[worker] ai_jobs · ${r.ok} ok · ${r.reintentos} reintentos · ${r.errores} errores`,
+      );
+    }
   } catch (err) {
     console.error("[worker] ai_jobs ERROR:", err instanceof Error ? err.message : err);
   } finally {

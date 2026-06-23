@@ -88,7 +88,18 @@ export async function obtenerJob(userId: string, id: string): Promise<AiJob | nu
   return data ? rowToJob(data as JobRow) : null;
 }
 
-/** Cierra un job con su resultado (ok) o su error (reintentable). */
+/** Re-encola un job fallido para más tarde (backoff): vuelve a `pendiente`. */
+export async function reintentar(id: string, delayMs: number, error: string): Promise<void> {
+  const sb = createSupabaseServiceClient();
+  const proximo = new Date(Date.now() + delayMs).toISOString();
+  const { error: e } = await sb
+    .from("ai_jobs")
+    .update({ estado: "pendiente", error, next_attempt_at: proximo })
+    .eq("id", id);
+  if (e) throw new Error(`reintentar: ${e.message}`);
+}
+
+/** Cierra un job con su resultado (ok) o su error (terminal). */
 export async function marcar(
   id: string,
   estado: Extract<EstadoJob, "ok" | "error">,
