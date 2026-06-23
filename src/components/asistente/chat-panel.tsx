@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "motion/react";
 import { X, Send, Sparkles } from "lucide-react";
 import { ChatMessage, type ChatMsg } from "@/components/asistente/chat-message";
 import { SuggestionCard } from "@/components/asistente/suggestion-card";
@@ -34,8 +35,13 @@ export function ChatPanel({
   }
 
   return (
-    <section
+    <motion.section
       aria-label="Asistente"
+      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 12, scale: 0.98 }}
+      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+      style={{ transformOrigin: "bottom right" }}
       className={cn(
         "flex flex-col overflow-hidden border border-border bg-card shadow-soft",
         // Móvil: sheet casi completo, encima de la bottom nav (h-16).
@@ -92,6 +98,6 @@ export function ChatPanel({
           <Send className="size-4" />
         </button>
       </form>
-    </section>
+    </motion.section>
   );
 }
