@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Sparkles } from "lucide-react";
 import { preguntarAsistente, proponerContexto, consultarJob } from "@/lib/actions/ai";
 import { ChatPanel } from "@/components/asistente/chat-panel";
@@ -146,20 +147,39 @@ export function ChatBubble({
     timer.current = setTimeout(poll, pollMs);
   }
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Abrir asistente"
-        className="fixed bottom-20 right-4 z-50 grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-soft transition-transform hover:scale-105 md:bottom-6 md:right-6"
-      >
-        <Sparkles className="size-6" />
-      </button>
-    );
-  }
-
   return (
-    <ChatPanel messages={messages} pending={pending} onSend={onSend} onClose={() => setOpen(false)} />
+    <>
+      <AnimatePresence>
+        {!open && (
+          <motion.button
+            key="fab"
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Abrir asistente"
+            className="fixed bottom-20 right-4 z-50 grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-soft md:bottom-6 md:right-6"
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.6 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+          >
+            <Sparkles className="size-6" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {open && (
+          <ChatPanel
+            key="panel"
+            messages={messages}
+            pending={pending}
+            onSend={onSend}
+            onClose={() => setOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }

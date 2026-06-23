@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "motion/react";
+import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorradorContexto } from "@/types/ai";
 
@@ -26,8 +30,19 @@ export function ChatMessage({ msg }: { msg: ChatMsg }) {
         )}
       >
         {msg.pendiente ? (
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
-            <span className="animate-pulse">✦ pensando…</span>
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <Sparkles className="size-3.5 text-primary" />
+            <span>pensando</span>
+            <span className="inline-flex items-end gap-0.5" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="size-1 rounded-full bg-current"
+                  animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "easeInOut", delay: i * 0.18 }}
+                />
+              ))}
+            </span>
           </span>
         ) : (
           <p className="whitespace-pre-wrap">{msg.contenido}</p>
