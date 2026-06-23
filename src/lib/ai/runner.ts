@@ -3,6 +3,8 @@ import { spawn } from "node:child_process";
 import { env } from "@/config/env";
 import { recuperarContexto, listarContexto } from "@/lib/ai/context/retrieve";
 import { tomarSiguiente, marcar, reintentar } from "@/lib/ai/jobs";
+import { listMovimientos, listDeudas } from "@/lib/services/finanzas";
+import { resumen, resumenDeudas, porMes } from "@/lib/finanzas/aggregations";
 import { JOB_OUTPUT_SCHEMAS, type AiJob } from "@/types/ai";
 import type { FragmentoContexto } from "@/types/contexto";
 
@@ -22,8 +24,8 @@ function textoEntrada(job: AiJob): string {
   return "";
 }
 
-/** Construye el prompt (puro y testeable). El contexto siempre es publicado. */
-export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[]): string {
+/** Construye el prompt (puro y testeable). `datos` = snapshot financiero (consulta_rag). */
+export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], datos?: string): string {
   const contexto = fragmentos.length
     ? fragmentos.map((f, i) => `[#${i + 1}] (id:${f.id}) ${f.titulo}\n${f.contenido}`).join("\n\n")
     : "(sin contexto relevante)";
@@ -32,10 +34,13 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[]): st
   if (job.tipo === "consulta_rag") {
     return [
       "Eres el asistente de home-os (gestión personal). Responde en español, conciso.",
-      "Usa ÚNICAMENTE el CONTEXTO de abajo (conocimiento publicado del usuario). Si no alcanza, dilo.",
+      "Usa los DATOS FINANCIEROS y el CONTEXTO de abajo para responder. Si no alcanzan, dilo.",
       "Devuelve EXCLUSIVAMENTE un JSON válido con esta forma, sin texto extra ni markdown:",
       '{ "respuesta": string, "fuentes": [ { "id": string, "titulo": string } ] }',
-      "En `fuentes` incluye solo los fragmentos que realmente usaste (su id y título).",
+      "En `fuentes` cita solo los fragmentos de CONTEXTO que usaste (su id y título).",
+      "",
+      "=== DATOS FINANCIEROS ===",
+      datos ?? "(no disponibles)",
       "",
       "=== CONTEXTO ===",
       contexto,
@@ -95,15 +100,38 @@ function invocarClaude(prompt: string): Promise<string> {
   });
 }
 
+/** Snapshot compacto de finanzas (single-user) para que el asistente responda con cifras. */
+async function snapshotFinanzas(): Promise<string> {
+  const [movs, deudas] = await Promise.all([listMovimientos(), listDeudas()]);
+  const r = resumen(movs);
+  const rd = resumenDeudas(deudas);
+  const meses = porMes(movs).slice(0, 3);
+  const eur = (n: number) => `${n.toFixed(2)} €`;
+  const lineas = [
+    `Balance global: ${eur(r.balance)}`,
+    `Ingresos totales: ${eur(r.ingresos)} · Gastos totales: ${eur(r.gastos)}`,
+    `Deudas: por pagar ${eur(rd.total)} · por cobrar ${eur(rd.totalPorCobrar)}`,
+    `Movimientos registrados: ${r.total}`,
+  ];
+  if (meses.length) {
+    lineas.push(
+      `Últimos meses (balance): ${meses.map((m) => `${m.mes}: ${eur(m.balance)}`).join(" · ")}`,
+    );
+  }
+  return lineas.join("\n");
+}
+
 export type RunnerDeps = {
   invocar: (prompt: string) => Promise<string>;
   recuperar: typeof recuperarContexto;
   listar: typeof listarContexto;
+  finanzas: () => Promise<string>;
 };
 const defaultDeps: RunnerDeps = {
   invocar: invocarClaude,
   recuperar: recuperarContexto,
   listar: listarContexto,
+  finanzas: snapshotFinanzas,
 };
 
 /**
@@ -120,7 +148,8 @@ export async function ejecutarJob(job: AiJob, deps: RunnerDeps = defaultDeps): P
     job.tipo === "proponer_contexto"
       ? await deps.listar(job.userId)
       : await deps.recuperar(job.userId, { consulta: textoEntrada(job), k: 8 });
-  const prompt = construirPrompt(job, fragmentos);
+  const datos = job.tipo === "consulta_rag" ? await deps.finanzas() : undefined;
+  const prompt = construirPrompt(job, fragmentos, datos);
   const raw = await deps.invocar(prompt);
   return schema.parse(extraerJson(raw)); // ZodError ⇒ el job se marca error (reintentable)
 }
