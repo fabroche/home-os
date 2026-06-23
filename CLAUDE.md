@@ -66,7 +66,7 @@ La app encola tareas en `ai_jobs` (Supabase) y el `worker` las drena con el runn
 
 ## Estado actual (2026-06-23) — EN PRODUCCIÓN
 Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **worker** (sync 24/7) +
-**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 181 tests verdes.
+**Supabase** self-host (`homeos-supabase.genzai.cloud`). Repo: `github.com/fabroche/home-os`. 183 tests verdes.
 
 **Implementado:**
 - **T1 · Capa Notion** (`src/lib/notion/`): client (fetch nativo undici — el `node-fetch@2` del SDK fallaba
@@ -86,12 +86,14 @@ Desplegado en Dokploy (VPS): **app web** (`homeos.genzai.cloud`, con login) + **
   por tipo/tag/vigencia + FTS Postgres (sin embeddings, D7). Migración `0002_contexto.sql` **aplicada**
   (incluye la función SQL `recuperar_contexto`). UI en `/contexto`.
 - **M6 · Asistente IA (MVP)**: cola `ai_jobs` (claim atómico `tomar_ai_job` con SKIP LOCKED) + **runner
-  headless** (`claude -p --output-format json`, contexto M4, **salida validada con Zod**, reintentos con
-  backoff). **Burbuja de chat** (FAB + sheet móvil/tarjeta desktop, polling) sobre `consulta_rag`, y
-  **proponer contexto** (`proponer_contexto` → `SuggestionCard` con Revisar y publicar / Guardar borrador /
-  Descartar). **Gobernanza M4↔M6:** decide solo con publicado, escribe solo borradores, publicar = usuario.
-  Migraciones `0005`/`0006`. Auth runner por `CLAUDE_CODE_OAUTH_TOKEN`. Engine-agnóstico (deps inyectables).
-  **Pendiente (Fase 5):** rotación de token in-app cifrada + banner de estado; observabilidad en dashboard.
+  headless** (`claude -p --output-format json`, contexto M4 + **snapshot financiero**, **salida validada con
+  Zod**, reintentos con backoff). **Burbuja de chat** (FAB + sheet móvil/tarjeta desktop, polling,
+  **historial en sessionStorage**, animaciones motion) sobre `consulta_rag`, y **proponer contexto**
+  (`proponer_contexto` → `SuggestionCard` con Revisar y publicar / Guardar borrador / Descartar).
+  **Gobernanza M4↔M6:** decide solo con publicado, escribe solo borradores, publicar = usuario.
+  Migraciones `0005`/`0006`. Auth runner por `CLAUDE_CODE_OAUTH_TOKEN` (CLI fijado en la imagen del worker).
+  Engine-agnóstico (deps inyectables). **Pendiente (Fase 5):** rotación de token in-app cifrada + banner de
+  estado; observabilidad de jobs en dashboard; intención por clasificación del modelo (hoy heurística).
 - **T5 · Sistema de diseño**: identidad editorial (Inter Tight + Instrument Serif italic, marca violeta
   `#4928fd`, light+dark con next-themes, motion discreto). Primitivas en `src/components/{ui,theme,motion}`.
   Header persistente (grupo `(dashboard)`) + **loading skeletons a medida**. **Storybook 10** (stories + a11y +

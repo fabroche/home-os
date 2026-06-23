@@ -8,11 +8,14 @@
 | **Lo usan** | M1 (conciliación), M2 (scoring/resúmenes), M3 (clasificación/extracción) |
 
 > **Estado de implementación (2026-06-23).** Hecho: cola `ai_jobs` (claim atómico), runner headless
-> (contexto M4 + validación Zod + reintentos/backoff), burbuja de chat (`consulta_rag`, polling),
-> proponer contexto (`proponer_contexto` + `SuggestionCard`), gobernanza M4↔M6. Migraciones `0005`/`0006`.
-> **Pendiente (Fase 5):** rotación de `CLAUDE_CODE_OAUTH_TOKEN` desde la app (cifrada) + banner de estado
-> (RF-M6-013); observabilidad de jobs en el dashboard (RF-M6-006, parte UI). Mejoras: "Revisar y publicar"
-> abriendo el editor M4 precargado; intención preguntar/enseñar por clasificación del modelo (hoy heurística).
+> (contexto M4 + **snapshot financiero** + validación Zod + reintentos/backoff), burbuja de chat
+> (`consulta_rag`, polling, **historial en sessionStorage**, **animaciones** motion), proponer contexto
+> (`proponer_contexto` + `SuggestionCard`), gobernanza M4↔M6. Migraciones `0005`/`0006`. CLI `claude` fijado
+> en `worker.Dockerfile` (`@anthropic-ai/claude-code@2.1.186`); auth por `CLAUDE_CODE_OAUTH_TOKEN`.
+> **Pendiente (Fase 5):** rotación de token desde la app (cifrada) + banner de estado (RF-M6-013);
+> observabilidad de jobs en el dashboard (RF-M6-006, parte UI). Mejoras: "Revisar y publicar" abriendo el
+> editor M4 precargado; intención preguntar/enseñar por clasificación del modelo (hoy heurística); el
+> snapshot financiero es single-user y resumido (no consultas finas tipo tool-use).
 
 ## 1. Propósito y alcance
 Capa de IA **agnóstica al motor**: la app encola tareas en `AI_JOB`; el **worker** las ejecuta con
