@@ -45,6 +45,8 @@ export type ChatMsg = {
   movimientoPagar?: MovimientoAPagar;
   /** Si está presente, el mensaje propone BORRAR un movimiento o deuda (se confirma en tarjeta). */
   borrarObjetivo?: ObjetivoBorrar;
+  /** Si está presente, hay VARIOS candidatos a borrar: el usuario elige cuál antes de confirmar. */
+  borrarCandidatos?: ObjetivoBorrar[];
   /** Si está presente, el router pidió aclarar la intención (se renderiza como tarjeta de opciones). */
   aclarar?: AclararData;
   /** Mensaje original del usuario (en el bubble pendiente del router): lo necesita la tarjeta "aclarar". */

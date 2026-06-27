@@ -144,7 +144,7 @@ export type JobEstado =
   | { estado: "ok"; tipo: "registrar_ingreso"; propuesta: CrearMovimientoInput | null; nota?: string }
   | { estado: "ok"; tipo: "registrar_deuda"; propuestaDeuda: CrearDeudaInput | null; nota?: string }
   | { estado: "ok"; tipo: "marcar_pagado"; movimiento: MarcarPagadoOutput["movimiento"]; nota?: string }
-  | { estado: "ok"; tipo: "borrar"; objetivo: ObjetivoBorrar | null; nota?: string }
+  | { estado: "ok"; tipo: "borrar"; objetivo: ObjetivoBorrar | null; candidatos: ObjetivoBorrar[]; nota?: string }
   | { estado: "ok"; tipo: "aclarar"; pregunta: string; opciones: { etiqueta: string; accion: AccionAsistente }[] }
   | { estado: "error"; error: string };
 
@@ -194,7 +194,7 @@ export async function consultarJob(jobId: string): Promise<JobEstado> {
           case "pagado":
             return { estado: "ok", tipo: "marcar_pagado", movimiento: d.movimiento, nota: d.nota };
           case "borrar":
-            return { estado: "ok", tipo: "borrar", objetivo: d.objetivo, nota: d.nota };
+            return { estado: "ok", tipo: "borrar", objetivo: d.objetivo, candidatos: d.candidatos, nota: d.nota };
           case "contexto":
             return { estado: "ok", tipo: "proponer_contexto", borradores: d.borradores };
           case "aclarar":

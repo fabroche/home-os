@@ -25,7 +25,13 @@ function esCardSinResolver(m: ChatMsg): boolean {
   return (
     !m.accionResuelta &&
     Boolean(
-      m.propuestaGasto || m.propuestaDeuda || m.movimientoPagar || m.borrarObjetivo || m.borrador || m.aclarar,
+      m.propuestaGasto ||
+        m.propuestaDeuda ||
+        m.movimientoPagar ||
+        m.borrarObjetivo ||
+        m.borrarCandidatos ||
+        m.borrador ||
+        m.aclarar,
     )
   );
 }
@@ -54,6 +60,12 @@ function turnoDeMensaje(m: ChatMsg): TurnoConversacion | null {
   if (m.borrarObjetivo) {
     const o = m.borrarObjetivo;
     return { rol: "assistant", texto: `Propuse borrar ${o.tipo}: "${o.nombre}".` };
+  }
+  if (m.borrarCandidatos?.length) {
+    return {
+      rol: "assistant",
+      texto: `Ofrecí elegir cuál borrar: ${m.borrarCandidatos.map((c) => `"${c.nombre}"`).join(", ")}.`,
+    };
   }
   if (m.borrador) return { rol: "assistant", texto: `Propuse guardar en el banco de contexto: "${m.borrador.titulo}".` };
   if (m.aclarar) return { rol: "assistant", texto: `Pedí aclaración: ${m.aclarar.pregunta}` };
@@ -244,10 +256,13 @@ export function ChatBubble({
             }
           } else if (st.tipo === "borrar") {
             const obj = st.objetivo;
+            const cands = st.candidatos ?? [];
             actualizar(aMsgId, {
               contenido: obj
                 ? "¿Confirmas el borrado?"
-                : st.nota || "No tengo claro qué borrar. ¿Me dices cuál?",
+                : cands.length
+                  ? "Encontré varios. ¿Cuál quieres borrar?"
+                  : st.nota || "No tengo claro qué borrar. ¿Me dices cuál?",
               pendiente: false,
               jobId: undefined,
             });
@@ -255,6 +270,11 @@ export function ChatBubble({
               setMessages((ms) => [
                 ...ms,
                 { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", borrarObjetivo: obj },
+              ]);
+            } else if (cands.length) {
+              setMessages((ms) => [
+                ...ms,
+                { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", borrarCandidatos: cands },
               ]);
             }
           } else if (st.tipo === "aclarar") {

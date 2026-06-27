@@ -57,6 +57,26 @@ describe("BorrarCard", () => {
     expect(screen.queryByText(/^Borrado/)).not.toBeInTheDocument();
   });
 
+  it("con varios candidatos pide elegir y luego confirma el elegido", async () => {
+    borrarMovimiento.mockResolvedValue({ ok: true, id: "m2" });
+    render(
+      <BorrarCard
+        candidatos={[
+          { tipo: "movimiento", id: "m1", nombre: "Sushi con amigos" },
+          { tipo: "movimiento", id: "m2", nombre: "Comida con Ana" },
+        ]}
+      />,
+    );
+    expect(screen.getByText(/cuál quieres borrar/i)).toBeInTheDocument();
+
+    // Elegir el segundo candidato → pasa al paso de confirmación.
+    fireEvent.click(screen.getByRole("button", { name: /comida con ana/i }));
+    expect(screen.queryByText(/cuál quieres borrar/i)).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: /sí, borrar/i }));
+    await waitFor(() => expect(borrarMovimiento).toHaveBeenCalledWith("m2"));
+  });
+
   it("nace congelada si llega con resueltoInicial (rehidratación)", () => {
     render(<BorrarCard objetivo={{ tipo: "deuda", id: "d1", nombre: "Préstamo" }} resueltoInicial="borrado" />);
     expect(screen.getByText(/^Borrado/)).toBeInTheDocument();

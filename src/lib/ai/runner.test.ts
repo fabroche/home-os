@@ -239,9 +239,31 @@ describe("ejecutarJob", () => {
     expect(res.objetivo).toMatchObject({ tipo: "deuda", id: "bd1" });
   });
 
+  it("asistente: borrar ambiguo devuelve varios candidatos para elegir", async () => {
+    const j = job({ tipo: "asistente", payload: { mensaje: "borra un gasto de comida" } });
+    const invocar = async () =>
+      JSON.stringify({
+        accion: "borrar",
+        objetivo: null,
+        candidatos: [
+          { tipo: "movimiento", id: "m1", nombre: "Sushi con amigos" },
+          { tipo: "movimiento", id: "m2", nombre: "Comida con Ana" },
+        ],
+        nota: "",
+      });
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
+      accion: string;
+      objetivo: null;
+      candidatos: unknown[];
+    };
+    expect(res.accion).toBe("borrar");
+    expect(res.objetivo).toBeNull();
+    expect(res.candidatos).toHaveLength(2);
+  });
+
   it("asistente: borrar acepta objetivo null con nota cuando no hay match", async () => {
     const j = job({ tipo: "asistente", payload: { mensaje: "borra eso" } });
-    const invocar = async () => JSON.stringify({ accion: "borrar", objetivo: null, nota: "¿Cuál exactamente?" });
+    const invocar = async () => JSON.stringify({ accion: "borrar", objetivo: null, candidatos: [], nota: "¿Cuál exactamente?" });
     const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
       accion: string;
       objetivo: null;
