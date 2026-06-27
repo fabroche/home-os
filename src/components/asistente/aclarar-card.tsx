@@ -5,6 +5,7 @@ import { HelpCircle } from "lucide-react";
 import { Card, CardLabel } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { AccionAsistente } from "@/types/ai";
+import type { AccionResuelta } from "@/components/asistente/chat-message";
 
 export type AclararData = {
   pregunta: string;
@@ -21,18 +22,33 @@ export type AclararData = {
  */
 export function AclararCard({
   aclarar,
+  resueltoInicial,
   onElegir,
+  onResuelto,
 }: {
   aclarar: AclararData;
+  /** Estado resuelto persistido (al rehidratar): si está, la card nace congelada. */
+  resueltoInicial?: AccionResuelta;
   onElegir?: (mensaje: string, accion: AccionAsistente) => void;
+  onResuelto?: (estado: AccionResuelta) => void;
 }) {
-  const [elegido, setElegido] = useState<string | null>(null);
+  // Resuelto efectivo = lo elegido aquí (local) o lo persistido/superado que llega por prop.
+  const [resueltoLocal, setResueltoLocal] = useState<AccionResuelta | null>(null);
+  const resuelto = resueltoLocal ?? resueltoInicial ?? null;
+  // Etiqueta de la opción elegida en esta sesión (al rehidratar no se conserva → texto genérico).
+  const [etiqueta, setEtiqueta] = useState<string | null>(null);
 
-  if (elegido) {
+  if (resuelto) {
+    const txt =
+      resuelto === "superado"
+        ? "Descartada (lo reescribiste)"
+        : etiqueta
+          ? `Has elegido: ${etiqueta}`
+          : "Ya elegiste una opción";
     return (
       <Card className="flex items-center gap-2 text-sm text-muted-foreground">
         <HelpCircle className="size-4 text-primary" />
-        Has elegido: <span className="font-medium text-foreground">{elegido}</span>
+        <span className="font-medium text-foreground">{txt}</span>
       </Card>
     );
   }
@@ -48,7 +64,9 @@ export function AclararCard({
             size="sm"
             variant="ghost"
             onClick={() => {
-              setElegido(o.etiqueta);
+              setEtiqueta(o.etiqueta);
+              setResueltoLocal("elegido");
+              onResuelto?.("elegido");
               onElegir?.(aclarar.mensaje, o.accion);
             }}
           >

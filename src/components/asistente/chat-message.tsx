@@ -9,6 +9,23 @@ import type { MovimientoAPagar } from "@/components/asistente/marcar-pagado-card
 import type { AclararData } from "@/components/asistente/aclarar-card";
 
 export type Fuente = { id: string; titulo: string };
+
+/**
+ * Estado final de una tarjeta de acción una vez el usuario interactuó con ella (o fue
+ * superada por un mensaje posterior). Vive en el `ChatMsg`, así que **persiste** en
+ * sessionStorage: al reabrir/recargar la card se pinta resuelta y deja de ser interactuable.
+ * `"superado"` = el usuario escribió de nuevo sin confirmarla, así que se congela.
+ */
+export type AccionResuelta =
+  | "creado"
+  | "pagado"
+  | "publicado"
+  | "borrador"
+  | "cancelado"
+  | "descartado"
+  | "elegido"
+  | "superado";
+
 export type ChatMsg = {
   id: string;
   rol: "user" | "assistant";
@@ -29,6 +46,8 @@ export type ChatMsg = {
   aclarar?: AclararData;
   /** Mensaje original del usuario (en el bubble pendiente del router): lo necesita la tarjeta "aclarar". */
   mensajeOrigen?: string;
+  /** Estado final de la tarjeta de acción (si ya se resolvió o fue superada). Persiste en sessionStorage. */
+  accionResuelta?: AccionResuelta;
 };
 
 /** Una burbuja de mensaje del asistente (usuario a la derecha, IA a la izquierda). */

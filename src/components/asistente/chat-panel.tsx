@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { X, Send, Sparkles } from "lucide-react";
-import { ChatMessage, type ChatMsg } from "@/components/asistente/chat-message";
+import { ChatMessage, type ChatMsg, type AccionResuelta } from "@/components/asistente/chat-message";
 import { SuggestionCard } from "@/components/asistente/suggestion-card";
 import { ActionCard } from "@/components/asistente/action-card";
 import { DeudaCard } from "@/components/asistente/deuda-card";
@@ -23,12 +23,15 @@ export function ChatPanel({
   pending,
   onSend,
   onElegirAccion,
+  onResuelto,
   onClose,
 }: {
   messages: ChatMsg[];
   pending: boolean;
   onSend: (texto: string) => void;
   onElegirAccion?: (mensaje: string, accion: AccionAsistente) => void;
+  /** Persiste el estado final de una tarjeta de acción en el mensaje que la contiene. */
+  onResuelto?: (id: string, estado: AccionResuelta) => void;
   onClose: () => void;
 }) {
   const [texto, setTexto] = useState("");
@@ -83,15 +86,41 @@ export function ChatPanel({
         ) : (
           messages.map((m) =>
             m.borrador ? (
-              <SuggestionCard key={m.id} borrador={m.borrador} />
+              <SuggestionCard
+                key={m.id}
+                borrador={m.borrador}
+                resueltoInicial={m.accionResuelta}
+                onResuelto={(estado) => onResuelto?.(m.id, estado)}
+              />
             ) : m.propuestaGasto ? (
-              <ActionCard key={m.id} propuesta={m.propuestaGasto} />
+              <ActionCard
+                key={m.id}
+                propuesta={m.propuestaGasto}
+                resueltoInicial={m.accionResuelta}
+                onResuelto={(estado) => onResuelto?.(m.id, estado)}
+              />
             ) : m.propuestaDeuda ? (
-              <DeudaCard key={m.id} propuesta={m.propuestaDeuda} />
+              <DeudaCard
+                key={m.id}
+                propuesta={m.propuestaDeuda}
+                resueltoInicial={m.accionResuelta}
+                onResuelto={(estado) => onResuelto?.(m.id, estado)}
+              />
             ) : m.movimientoPagar ? (
-              <MarcarPagadoCard key={m.id} movimiento={m.movimientoPagar} />
+              <MarcarPagadoCard
+                key={m.id}
+                movimiento={m.movimientoPagar}
+                resueltoInicial={m.accionResuelta}
+                onResuelto={(estado) => onResuelto?.(m.id, estado)}
+              />
             ) : m.aclarar ? (
-              <AclararCard key={m.id} aclarar={m.aclarar} onElegir={onElegirAccion} />
+              <AclararCard
+                key={m.id}
+                aclarar={m.aclarar}
+                resueltoInicial={m.accionResuelta}
+                onElegir={onElegirAccion}
+                onResuelto={(estado) => onResuelto?.(m.id, estado)}
+              />
             ) : (
               <ChatMessage key={m.id} msg={m} />
             ),

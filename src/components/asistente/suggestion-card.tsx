@@ -8,8 +8,7 @@ import type { BorradorContexto } from "@/types/ai";
 import { Card, CardLabel } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-type Resuelto = "publicado" | "borrador" | "descartado";
+import type { AccionResuelta } from "@/components/asistente/chat-message";
 
 /**
  * Tarjeta de sugerencia de contexto (M6 · F-M6-6). La IA propone un borrador; el
@@ -18,12 +17,17 @@ type Resuelto = "publicado" | "borrador" | "descartado";
  */
 export function SuggestionCard({
   borrador,
+  resueltoInicial,
   onResuelto,
 }: {
   borrador: BorradorContexto;
-  onResuelto?: (estado: Resuelto) => void;
+  /** Estado resuelto persistido (al rehidratar): si está, la card nace congelada. */
+  resueltoInicial?: AccionResuelta;
+  onResuelto?: (estado: AccionResuelta) => void;
 }) {
-  const [resuelto, setResuelto] = useState<Resuelto | null>(null);
+  // Resuelto efectivo = lo decidido aquí (local) o lo persistido/superado que llega por prop.
+  const [resueltoLocal, setResueltoLocal] = useState<AccionResuelta | null>(null);
+  const resuelto = resueltoLocal ?? resueltoInicial ?? null;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +42,7 @@ export function SuggestionCard({
         estado,
       });
       if (res.ok) {
-        setResuelto(estado);
+        setResueltoLocal(estado);
         onResuelto?.(estado);
       } else {
         setError(res.error);
@@ -52,7 +56,9 @@ export function SuggestionCard({
         ? "Publicado"
         : resuelto === "borrador"
           ? "Guardado como borrador"
-          : "Descartado";
+          : resuelto === "superado"
+            ? "Descartado (lo reescribiste)"
+            : "Descartado";
     return (
       <Card className="flex items-center gap-2 text-sm text-muted-foreground">
         <Check className="size-4 text-income" />
@@ -95,7 +101,7 @@ export function SuggestionCard({
           size="sm"
           disabled={pending}
           onClick={() => {
-            setResuelto("descartado");
+            setResueltoLocal("descartado");
             onResuelto?.("descartado");
           }}
         >
