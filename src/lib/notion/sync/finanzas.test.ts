@@ -19,12 +19,16 @@ vi.mock("@/lib/notion/schema", () => ({
 vi.mock("@/lib/notion/mappers/presupuesto", () => ({ toMovimiento: (x: unknown) => x }));
 vi.mock("@/lib/notion/mappers/deuda", () => ({ toDeuda: (x: unknown) => x }));
 
-// Mock del cliente Supabase: registra upserts y devuelve filas "barridas" por tabla.
+// Mock del cliente Supabase: registra upserts y devuelve filas "barridas" / "reclamadas" por tabla.
 const upserts: { tabla: string; rows: unknown[] }[] = [];
 let sweepResult: Record<string, unknown[]> = {};
+let reclamadosResult: Record<string, { notion_page_id: string }[]> = {};
 const sweptTables: string[] = [];
 
+// Builder encadenable y "thenable": resuelve a las filas barridas (si pasó por update) o a las
+// reclamadas (select+eq+not, sin update). Cubre el sweep y `notionIdsReclamados` (Fase B).
 function makeBuilder(tabla: string) {
+  let modo: "query" | "sweep" = "query";
   const builder: Record<string, unknown> = {};
   builder.upsert = (rows: unknown[]) => {
     if (tabla !== "sync_state") upserts.push({ tabla, rows });
@@ -32,11 +36,18 @@ function makeBuilder(tabla: string) {
   };
   builder.update = () => {
     sweptTables.push(tabla);
-    return builder; // encadenable: .lt().is().select()
+    modo = "sweep";
+    return builder;
   };
   builder.lt = () => builder;
   builder.is = () => builder;
-  builder.select = () => Promise.resolve({ data: sweepResult[tabla] ?? [], error: null });
+  builder.eq = () => builder;
+  builder.not = () => builder;
+  builder.select = () => builder;
+  builder.then = (resolve: (v: { data: unknown[]; error: null }) => unknown) => {
+    const data = modo === "sweep" ? (sweepResult[tabla] ?? []) : (reclamadosResult[tabla] ?? []);
+    return Promise.resolve({ data, error: null }).then(resolve);
+  };
   return builder;
 }
 
@@ -51,6 +62,7 @@ beforeEach(() => {
   upserts.length = 0;
   sweptTables.length = 0;
   sweepResult = {};
+  reclamadosResult = {};
 });
 
 describe("syncFinanzas · mark-and-sweep", () => {
@@ -79,6 +91,24 @@ describe("syncFinanzas · mark-and-sweep", () => {
 
     const movUpsert = upserts.find((u) => u.tabla === "movimiento");
     expect((movUpsert?.rows[0] as { deleted_at: unknown }).deleted_at).toBeNull();
+  });
+
+  it("Fase B: NO reimporta páginas que la app adoptó (origen='app')", async () => {
+    queryDatabase
+      .mockResolvedValueOnce([
+        { notionPageId: "m1", ultimaEdicion: "2026-06-01" },
+        { notionPageId: "m2", ultimaEdicion: "2026-06-02" },
+      ])
+      .mockResolvedValueOnce([]);
+    // m1 ya fue adoptada por la app → el importador debe saltarla.
+    reclamadosResult = { movimiento: [{ notion_page_id: "m1" }] };
+
+    const res = await syncFinanzas();
+
+    const movUpsert = upserts.find((u) => u.tabla === "movimiento");
+    const ids = (movUpsert?.rows as { notion_page_id: string }[]).map((r) => r.notion_page_id);
+    expect(ids).toEqual(["m2"]); // m1 excluida
+    expect(res.movimientos).toBe(1);
   });
 
   it("NO barre si el query no trajo registros (guarda anti-borrado masivo)", async () => {

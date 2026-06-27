@@ -22,6 +22,11 @@ export type Categoria = (typeof CATEGORIAS)[number];
 export type Flujo = "ingreso" | "gasto" | "deuda";
 
 export const MovimientoSchema = z.object({
+  // Identidad nativa (Fase B): `id` es la identidad real en Supabase. Al mapear DESDE Notion
+  // aún no hay `id` (lo pone la BD); en B1 todas las filas son de Notion, así que `notionPageId`
+  // sigue presente (en B2 pasará a opcional cuando existan filas nativas de la app).
+  id: z.string().optional(),
+  origen: z.string().optional(), // notion | app | email | manual
   notionPageId: z.string(),
   nombre: z.string(),
   fecha: z.string().nullable(), // ISO date (YYYY-MM-DD)
@@ -70,6 +75,8 @@ export type CrearMovimientoInput = z.infer<typeof CrearMovimientoInputSchema>;
 export const PERSONAS_DEUDA = ["Tia Anay", "RafaYDay", "Leo", "Guille"] as const;
 
 export const DeudaSchema = z.object({
+  id: z.string().optional(),
+  origen: z.string().optional(), // notion | app | email | manual
   notionPageId: z.string(),
   concepto: z.string(),
   fechaCreacion: z.string().nullable(),
