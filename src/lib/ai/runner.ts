@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { env } from "@/config/env";
 import { recuperarContexto, listarContexto } from "@/lib/ai/context/retrieve";
 import { tomarSiguiente, marcar, reintentar } from "@/lib/ai/jobs";
+import { CuotaAgotadaError, detectarCuota, esCuotaAgotada } from "@/lib/ai/errors";
 import { listMovimientos, listDeudas } from "@/lib/services/finanzas";
 import {
   resumen,
@@ -206,6 +207,10 @@ function invocarClaude(prompt: string): Promise<string> {
     child.stderr.on("data", (d) => (err += d.toString()));
     child.on("error", reject);
     child.on("close", (code) => {
+      // La cuota agotada puede salir con código 0 (envelope is_error) o no-cero, y el
+      // aviso aparece en stdout o stderr → la buscamos sobre todo el output, primero.
+      const cuota = detectarCuota(`${out}\n${err}`);
+      if (cuota.agotada) return reject(new CuotaAgotadaError(cuota.reset));
       if (code !== 0) return reject(new Error(`claude salió con código ${code}: ${err.slice(0, 300)}`));
       try {
         const envelope = JSON.parse(out) as { result?: unknown };
@@ -361,12 +366,13 @@ export async function drenarCola(
       resumen.ok++;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (job.intentos < maxReintentos) {
-        await reintentar(job.id, backoffMs(job.intentos), msg);
-        resumen.reintentos++;
-      } else {
+      // La cuota agotada no se arregla reintentando (se renueva en horas): error terminal.
+      if (esCuotaAgotada(e) || job.intentos >= maxReintentos) {
         await marcar(job.id, "error", { error: msg });
         resumen.errores++;
+      } else {
+        await reintentar(job.id, backoffMs(job.intentos), msg);
+        resumen.reintentos++;
       }
     }
   }

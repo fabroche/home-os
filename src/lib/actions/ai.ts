@@ -2,6 +2,7 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { encolar, obtenerJob } from "@/lib/ai/jobs";
+import { mensajeErrorJob } from "@/lib/ai/errors";
 import {
   ConsultaRagPayloadSchema,
   ConsultaRagOutputSchema,
@@ -151,7 +152,7 @@ export async function consultarJob(jobId: string): Promise<JobEstado> {
     const user = await requireUser();
     const job = await obtenerJob(user.id, jobId);
     if (!job) return { estado: "desconocido" };
-    if (job.estado === "error") return { estado: "error", error: job.error ?? "Error en la consulta." };
+    if (job.estado === "error") return { estado: "error", error: mensajeErrorJob(job.error) };
     if (job.estado === "ok") {
       if (job.tipo === "proponer_contexto") {
         const out = ProponerContextoOutputSchema.safeParse(job.resultado);
