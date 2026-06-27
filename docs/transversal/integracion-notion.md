@@ -100,6 +100,24 @@ export function toGasto(page: PageObjectResponse): Gasto {
 - Escritura del usuario (home-os → Notion): solo campos acordados, vía `actions` → `lib/notion`, y
   re-sync para confirmar.
 
+## Evolución (Fase B, 2026-06-27): Notion → **importador**
+
+Decisión de arquitectura `D-2026-06-27` (ver `00-overview/01-arquitectura-c4.md`): se abandona el modelo
+híbrido con Notion como fuente de verdad. Notion pasa a ser un **importador opcional** de datos históricos;
+la fuente de verdad es Supabase.
+
+Qué cambia en esta capa:
+- **Escritura**: las Server Actions (`crearMovimiento`, `crearDeuda`, borrar, marcar pagado…) escriben
+  **directo en Supabase**, no en Notion. `mutations.ts`/`properties-write.ts` dejan de estar en el camino
+  de la escritura del usuario (quedan solo para utilidades de importación, si se conservan).
+- **Sync → import**: `sync/finanzas.ts` deja de ser autoridad. Se vuelve **importador aditivo**: trae de
+  Notion solo lo que tenga `origen = notion` y **nunca pisa ni borra** filas con `origen = app`. El
+  mark-and-sweep de borrado (soft-delete con `deleted_at`) aplica **solo** al subconjunto `notion`.
+- **`origen`** (`notion | app`) en `movimiento`/`deuda` discrimina quién manda en cada fila.
+- A9 (híbrido) queda **superado** por esta decisión; el resto de reglas anti-patrón (A1–A8, A10–A13) siguen
+  vigentes para la importación.
+- **Multi-tenant**: cada usuario podrá conectar (o no) su Notion; quien no lo use vive 100% nativo.
+
 ## Notas de SDK
 - Versión del SDK / API de Notion: confirmar la que soporta **data sources** (el experimento usaba
   `dataSources.query` / `data_source_id`). Fijar la versión y el `Notion-Version` header.
