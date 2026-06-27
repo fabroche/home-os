@@ -85,9 +85,27 @@ async function sweepBorrados(
     .update({ deleted_at: runTs })
     .lt("synced_at", runTs)
     .is("deleted_at", null)
+    .eq("origen", "notion") // Fase B: el importador NUNCA toca filas nativas de la app.
     .select("notion_page_id");
   if (error) throw new Error(`sweep ${tabla}: ${error.message}`);
   return data?.length ?? 0;
+}
+
+/**
+ * Fase B: notion_page_ids cuya fila ya es `origen='app'` (la app la "adoptó" al editarla).
+ * El importador los SALTA: ni los reimporta ni los pisa, aunque la página siga en Notion.
+ */
+async function notionIdsReclamados(
+  sb: ReturnType<typeof createSupabaseServiceClient>,
+  tabla: "movimiento" | "deuda",
+): Promise<Set<string>> {
+  const { data, error } = await sb
+    .from(tabla)
+    .select("notion_page_id")
+    .eq("origen", "app")
+    .not("notion_page_id", "is", null);
+  if (error) throw new Error(`reclamados ${tabla}: ${error.message}`);
+  return new Set((data ?? []).map((r) => r.notion_page_id as string));
 }
 
 export async function syncFinanzas() {
@@ -96,21 +114,25 @@ export async function syncFinanzas() {
 
   // --- Presupuesto → movimiento ---
   const movs = (await queryDatabase(PRESUPUESTO.id)).map(toMovimiento);
-  const movRows = movs.map((m) => movimientoRow(m, now));
+  // Saltar las páginas que la app ya adoptó (origen='app'): no se reimportan ni se pisan.
+  const reclamadosMov = await notionIdsReclamados(sb, "movimiento");
+  const movRows = movs.map((m) => movimientoRow(m, now)).filter((r) => !reclamadosMov.has(r.notion_page_id));
   if (movRows.length > 0) {
     const { error } = await sb.from("movimiento").upsert(movRows, { onConflict: "notion_page_id" });
     if (error) throw new Error(`upsert movimiento: ${error.message}`);
   }
-  const movimientosBorrados = await sweepBorrados(sb, "movimiento", now, movRows.length);
+  // El guard de sweep usa lo que TRAJO Notion (movs.length), no lo filtrado.
+  const movimientosBorrados = await sweepBorrados(sb, "movimiento", now, movs.length);
 
   // --- Deudas_Personales → deuda ---
   const deudas = (await queryDatabase(DEUDAS.id)).map(toDeuda);
-  const deudaRows = deudas.map((d) => deudaRow(d, now));
+  const reclamadosDeuda = await notionIdsReclamados(sb, "deuda");
+  const deudaRows = deudas.map((d) => deudaRow(d, now)).filter((r) => !reclamadosDeuda.has(r.notion_page_id));
   if (deudaRows.length > 0) {
     const { error } = await sb.from("deuda").upsert(deudaRows, { onConflict: "notion_page_id" });
     if (error) throw new Error(`upsert deuda: ${error.message}`);
   }
-  const deudasBorradas = await sweepBorrados(sb, "deuda", now, deudaRows.length);
+  const deudasBorradas = await sweepBorrados(sb, "deuda", now, deudas.length);
 
   // --- sync_state (marca de la última corrida) ---
   const maxEdit = (arr: { ultimaEdicion: string }[]) =>

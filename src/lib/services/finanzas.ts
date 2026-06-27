@@ -13,6 +13,8 @@ export { resumen, type ResumenFinanzas } from "@/lib/finanzas/aggregations";
 
 // Filas de Supabase → DTO de dominio (validado con Zod).
 type MovimientoRow = {
+  id: string;
+  origen: string | null;
   notion_page_id: string;
   nombre: string | null;
   fecha: string | null;
@@ -28,6 +30,8 @@ type MovimientoRow = {
 };
 
 type DeudaRow = {
+  id: string;
+  origen: string | null;
   notion_page_id: string;
   concepto: string | null;
   fecha_creacion: string | null;
@@ -39,6 +43,8 @@ type DeudaRow = {
 
 function rowToMovimiento(r: MovimientoRow): Movimiento {
   return MovimientoSchema.parse({
+    id: r.id,
+    origen: r.origen ?? undefined,
     notionPageId: r.notion_page_id,
     nombre: r.nombre ?? "",
     fecha: r.fecha,
@@ -56,6 +62,8 @@ function rowToMovimiento(r: MovimientoRow): Movimiento {
 
 function rowToDeuda(r: DeudaRow): Deuda {
   return DeudaSchema.parse({
+    id: r.id,
+    origen: r.origen ?? undefined,
     notionPageId: r.notion_page_id,
     concepto: r.concepto ?? "",
     fechaCreacion: r.fecha_creacion,
