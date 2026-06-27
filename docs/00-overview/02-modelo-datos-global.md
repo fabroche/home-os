@@ -1,8 +1,15 @@
 # 02 · Modelo de datos global (ER canónico)
 
 Fuente **única de verdad** del modelo. Los módulos referencian estas entidades; no las redefinen.
-Vive en **Supabase (Postgres)**. Las entidades con `notion_page_id` son **espejo híbrido** de Notion
-(se editan en Notion, se sincronizan aquí). Todas llevan `user_id` para RLS (single-user, pero explícito).
+Vive en **Supabase (Postgres)**. Las entidades con `notion_page_id` **eran** espejo híbrido de Notion.
+Todas llevan `user_id` para RLS.
+
+> **Actualización Fase B (2026-06-27, ver `00-overview/01-arquitectura-c4.md`):** Supabase pasa a ser la
+> **fuente de verdad**. `MOVIMIENTO`/`DEUDA` ganan `origen` (`notion | app | email | manual`): las filas
+> `app` las crea/edita la propia app y el sync de Notion **no las toca**; `notion_page_id` queda **nullable**
+> (solo lo llevan las importadas de Notion). El sync deja de ser autoridad y se vuelve **importador**
+> aditivo. El modelo financiero nuevo (cuentas, tarjetas, gastos a plazos) es **nativo Supabase** desde el
+> día uno — ver `modules/M1-finanzas.md`.
 
 ```mermaid
 erDiagram

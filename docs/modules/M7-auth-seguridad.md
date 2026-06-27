@@ -12,7 +12,14 @@ Asegurar que **solo tú** accedes, y que las credenciales de terceros (Notion, G
 guardan de forma **segura**. Single-user, pero con `user_id` y RLS explícitos para poder crecer.
 
 **Dentro:** login (Supabase Auth, magic link), protección de rutas, RLS, cifrado de credenciales de
-cuentas, gestión de secretos. **Fuera:** multi-usuario/roles (futuro).
+cuentas, gestión de secretos. ~~**Fuera:** multi-usuario/roles (futuro).~~
+
+> **Actualización 2026-06-27 — multi-tenant entra en alcance (Fase C).** Tras la decisión Supabase-nativo
+> (`00-overview/01-arquitectura-c4.md`), el multi-usuario deja de ser "futuro": hay **2 testers** listos para
+> entrar con cuentas de prueba. Implica: alta de usuarios (signup controlado / invitación), **RLS por
+> `user_id` activada de lleno** en todas las tablas (hoy la lectura usa `service_role` por ser single-user —
+> ver §"Estado de implementación"), poblar `user_id` en datos y aislar el contexto de IA y las credenciales
+> por usuario. Notion pasa a integración **opcional por usuario**.
 
 ## 2. Actores
 Usuario; sistema (worker con service role).
@@ -26,6 +33,8 @@ Usuario; sistema (worker con service role).
 | RF-M7-004 | Cifrar credenciales de cuentas (Notion no incluye PII; Gmail/IMAP tokens) con AES-256-GCM. | Must |
 | RF-M7-005 | El worker usa **service role** para jobs de sistema (sin pasar por RLS de usuario). | Must |
 | RF-M7-006 | Endpoints `/api/cron/*` protegidos por `CRON_SECRET`. | Must |
+| RF-M7-007 | Alta multiusuario controlada (invitación / signup restringido) para los testers (Fase C). | Should |
+| RF-M7-008 | Aislar por `user_id` los datos, el banco de contexto de IA y las credenciales de cada usuario. | Should |
 
 ## 4. Requisitos no funcionales (RNF)
 | ID | Requisito | Métrica |
