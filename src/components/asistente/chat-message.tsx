@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BorradorContexto } from "@/types/ai";
+import type { BorradorContexto, ObjetivoBorrar } from "@/types/ai";
 import type { CrearMovimientoInput, CrearDeudaInput } from "@/types/finanzas";
 import type { MovimientoAPagar } from "@/components/asistente/marcar-pagado-card";
 import type { AclararData } from "@/components/asistente/aclarar-card";
@@ -19,6 +19,7 @@ export type Fuente = { id: string; titulo: string };
 export type AccionResuelta =
   | "creado"
   | "pagado"
+  | "borrado"
   | "publicado"
   | "borrador"
   | "cancelado"
@@ -42,6 +43,8 @@ export type ChatMsg = {
   propuestaDeuda?: CrearDeudaInput;
   /** Si está presente, el mensaje es un gasto pendiente a marcar como pagado. */
   movimientoPagar?: MovimientoAPagar;
+  /** Si está presente, el mensaje propone BORRAR un movimiento o deuda (se confirma en tarjeta). */
+  borrarObjetivo?: ObjetivoBorrar;
   /** Si está presente, el router pidió aclarar la intención (se renderiza como tarjeta de opciones). */
   aclarar?: AclararData;
   /** Mensaje original del usuario (en el bubble pendiente del router): lo necesita la tarjeta "aclarar". */

@@ -8,6 +8,7 @@ import { SuggestionCard } from "@/components/asistente/suggestion-card";
 import { ActionCard } from "@/components/asistente/action-card";
 import { DeudaCard } from "@/components/asistente/deuda-card";
 import { MarcarPagadoCard } from "@/components/asistente/marcar-pagado-card";
+import { BorrarCard } from "@/components/asistente/borrar-card";
 import { AclararCard } from "@/components/asistente/aclarar-card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -110,6 +111,13 @@ export function ChatPanel({
               <MarcarPagadoCard
                 key={m.id}
                 movimiento={m.movimientoPagar}
+                resueltoInicial={m.accionResuelta}
+                onResuelto={(estado) => onResuelto?.(m.id, estado)}
+              />
+            ) : m.borrarObjetivo ? (
+              <BorrarCard
+                key={m.id}
+                objetivo={m.borrarObjetivo}
                 resueltoInicial={m.accionResuelta}
                 onResuelto={(estado) => onResuelto?.(m.id, estado)}
               />

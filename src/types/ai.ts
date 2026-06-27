@@ -165,6 +165,14 @@ const MovimientoElegidoSchema = z.object({
   importe: z.number(),
 });
 
+/** Objetivo de un borrado propuesto por la IA: un movimiento o una deuda, con su id de Notion. */
+export const ObjetivoBorrarSchema = z.object({
+  tipo: z.enum(["movimiento", "deuda"]),
+  id: z.string().trim().min(1),
+  nombre: z.string().trim().min(1),
+});
+export type ObjetivoBorrar = z.infer<typeof ObjetivoBorrarSchema>;
+
 /**
  * Salida del router `asistente`: en UNA sola pasada el modelo clasifica la intención y
  * produce la propuesta correspondiente, o pide aclaración (`aclarar`) cuando el mensaje
@@ -178,6 +186,7 @@ export const AsistenteOutputSchema = z.discriminatedUnion("accion", [
   z.object({ accion: z.literal("ingreso"), propuesta: CrearMovimientoInputSchema.nullable(), nota: NotaSchema }),
   z.object({ accion: z.literal("deuda"), propuesta: CrearDeudaInputSchema.nullable(), nota: NotaSchema }),
   z.object({ accion: z.literal("pagado"), movimiento: MovimientoElegidoSchema.nullable(), nota: NotaSchema }),
+  z.object({ accion: z.literal("borrar"), objetivo: ObjetivoBorrarSchema.nullable(), nota: NotaSchema }),
   z.object({ accion: z.literal("contexto"), borradores: z.array(BorradorContextoSchema).min(1).max(5) }),
   z.object({
     accion: z.literal("aclarar"),

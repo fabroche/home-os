@@ -60,6 +60,7 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       '- "gasto" / "ingreso": registrar un movimiento NUEVO que el usuario hizo.',
       '- "deuda": registrar una deuda o un pago de deuda con una persona.',
       '- "pagado": marcar como pagado uno de los GASTOS PENDIENTES que YA existen (abajo).',
+      '- "borrar": ELIMINAR un movimiento o una deuda que YA existe (ej.: "borra el gasto del café").',
       '- "contexto": guardar conocimiento en su banco (preferencias, proveedores, reglas…).',
       '- "aclarar": SOLO si el mensaje podría interpretarse razonablemente de MÁS DE UNA forma',
       '  (ej.: "ya pagué la luz" puede ser un gasto nuevo, o marcar como pagada una luz que ya está',
@@ -73,6 +74,9 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       `- Personas de deuda conocidas: ${PERSONAS_DEUDA.join(", ")} (si menciona otra, úsala tal cual).`,
       '- importe/valor = número positivo en euros (magnitud). estado de movimiento = "Pending".',
       "- En \"pagado\" elige de GASTOS PENDIENTES y devuelve su id EXACTO; si ninguno encaja, movimiento:null.",
+      '- En "borrar" elige de MOVIMIENTOS Y DEUDAS (abajo) el que encaje y devuelve su id EXACTO y su tipo',
+      "  (\"movimiento\" o \"deuda\"); si ninguno encaja con claridad, objetivo:null y dilo en `nota`. Solo",
+      "  PROPONES el borrado: el usuario lo confirma después.",
       '- Una PREGUNTA nunca es una acción de registro: "¿en qué gasto más?" es "responder", no "gasto".',
       "- Si falta info para registrar (p.ej. el importe), usa esa acción con propuesta:null y dilo en `nota`.",
       "- Si el MENSAJE corrige o ajusta una propuesta anterior de la CONVERSACIÓN RECIENTE (cambia",
@@ -85,6 +89,7 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       '{ "accion": "gasto"|"ingreso", "propuesta": { "nombre": string, "importe": number, "categoria": string, "tipo": string, "fecha": "YYYY-MM-DD", "estado": "Pending" } | null, "nota": string }',
       '{ "accion": "deuda", "propuesta": { "concepto": string, "persona": string, "valor": number, "movimiento": "deuda"|"pago", "fecha": "YYYY-MM-DD" } | null, "nota": string }',
       '{ "accion": "pagado", "movimiento": { "id": string, "nombre": string, "importe": number } | null, "nota": string }',
+      '{ "accion": "borrar", "objetivo": { "tipo": "movimiento"|"deuda", "id": string, "nombre": string } | null, "nota": string }',
       '{ "accion": "contexto", "borradores": [ { "tipo": string, "titulo": string, "contenido": string, "tags": [string] } ] }',
       '{ "accion": "aclarar", "pregunta": string, "opciones": [ { "etiqueta": string, "accion": "responder"|"gasto"|"ingreso"|"deuda"|"pagado"|"contexto" } ] }',
       "En `fuentes` cita solo los fragmentos de CONTEXTO que usaste. En `contexto`, tipos válidos:",
@@ -294,12 +299,31 @@ async function movimientosPendientes(): Promise<string> {
     .join("\n");
 }
 
+/** Lista de movimientos y deudas (con su id de Notion) que la IA puede proponer BORRAR. */
+async function borrables(): Promise<string> {
+  const [movs, deudas] = await Promise.all([listMovimientos(), listDeudas()]);
+  const m = movs
+    .slice(0, 40)
+    .map((x) => `id:${x.notionPageId} | ${x.nombre} | ${Math.abs(x.importe ?? 0).toFixed(2)} € | ${x.fecha ?? "sin fecha"} | ${x.estado ?? ""}`);
+  const d = deudas
+    .slice(0, 40)
+    .map((x) => `id:${x.notionPageId} | ${x.concepto} | ${x.persona ?? "—"} | ${(x.valor ?? 0).toFixed(2)} €`);
+  return [
+    "MOVIMIENTOS:",
+    m.length ? m.join("\n") : "(ninguno)",
+    "",
+    "DEUDAS:",
+    d.length ? d.join("\n") : "(ninguna)",
+  ].join("\n");
+}
+
 export type RunnerDeps = {
   invocar: (prompt: string) => Promise<string>;
   recuperar: typeof recuperarContexto;
   listar: typeof listarContexto;
   finanzas: () => Promise<string>;
   pendientes: () => Promise<string>;
+  borrables: () => Promise<string>;
 };
 const defaultDeps: RunnerDeps = {
   invocar: invocarClaude,
@@ -307,6 +331,7 @@ const defaultDeps: RunnerDeps = {
   listar: listarContexto,
   finanzas: snapshotFinanzas,
   pendientes: movimientosPendientes,
+  borrables,
 };
 
 /**
@@ -331,8 +356,9 @@ export async function ejecutarJob(job: AiJob, deps: RunnerDeps = defaultDeps): P
     datos = await deps.finanzas();
   } else if (job.tipo === "asistente") {
     // El router puede acabar en CUALQUIER acción, así que recibe todo lo que podría
-    // necesitar (snapshot para responder + lista de pendientes para marcar pagado + hoy).
-    const [snap, pend] = await Promise.all([deps.finanzas(), deps.pendientes()]);
+    // necesitar (snapshot para responder + pendientes para marcar pagado + borrables
+    // para borrar + hoy).
+    const [snap, pend, borr] = await Promise.all([deps.finanzas(), deps.pendientes(), deps.borrables()]);
     datos = [
       `FECHA DE HOY: ${hoy()}`,
       "",
@@ -341,6 +367,9 @@ export async function ejecutarJob(job: AiJob, deps: RunnerDeps = defaultDeps): P
       "",
       "=== GASTOS PENDIENTES (formato: id:<id> | nombre | importe | fecha) ===",
       pend,
+      "",
+      "=== MOVIMIENTOS Y DEUDAS (para borrar; formato id:<id> | …) ===",
+      borr,
     ].join("\n");
   } else if (job.tipo === "registrar_gasto" || job.tipo === "registrar_ingreso" || job.tipo === "registrar_deuda") {
     datos = hoy(); // fecha de hoy para el prompt

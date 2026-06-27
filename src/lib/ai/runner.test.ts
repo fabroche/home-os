@@ -46,6 +46,8 @@ const recuperar = async () => [fragmento];
 const listar = async () => [fragmento];
 const finanzas = async () => "Balance global: 100,00 €";
 const pendientes = async () => "id:pg1 | Luz | 30.00 € | 2026-06-01";
+const borrables = async () =>
+  "MOVIMIENTOS:\nid:pg1 | Luz | 30.00 € | 2026-06-01 | Pending\n\nDEUDAS:\nid:bd1 | Préstamo | Leo | -50.00 €";
 
 beforeEach(() => {
   tomarSiguienteMock.mockReset();
@@ -88,6 +90,7 @@ describe("construirPrompt", () => {
     expect(p).toContain('"aclarar"'); // puede pedir desambiguación
     expect(p).toMatch(/"responder"/);
     expect(p).toMatch(/"gasto"\|"ingreso"/);
+    expect(p).toMatch(/"borrar"/); // ofrece la acción de borrado
     expect(p).toContain("Leo"); // contexto recuperado
   });
 
@@ -125,13 +128,13 @@ describe("extraerJson", () => {
 describe("ejecutarJob", () => {
   it("consulta_rag: valida y devuelve la salida conforme", async () => {
     const invocar = async () => JSON.stringify({ respuesta: "Leo te debe 50€", fuentes: [{ id: "c1", titulo: "Leo" }] });
-    const res = (await ejecutarJob(job(), { invocar, recuperar, listar, finanzas, pendientes })) as { respuesta: string };
+    const res = (await ejecutarJob(job(), { invocar, recuperar, listar, finanzas, pendientes, borrables })) as { respuesta: string };
     expect(res.respuesta).toBe("Leo te debe 50€");
   });
 
   it("lanza (reintentable) si la salida no conforma el esquema", async () => {
     const invocar = async () => JSON.stringify({ fuentes: [] }); // falta respuesta
-    await expect(ejecutarJob(job(), { invocar, recuperar, listar, finanzas, pendientes })).rejects.toThrow();
+    await expect(ejecutarJob(job(), { invocar, recuperar, listar, finanzas, pendientes, borrables })).rejects.toThrow();
   });
 
   it("registrar_gasto: valida y devuelve la propuesta de gasto", async () => {
@@ -141,7 +144,7 @@ describe("ejecutarJob", () => {
         propuesta: { nombre: "Comida", importe: 40, categoria: "Comida", tipo: "Gasto Variable", fecha: "2026-06-23", estado: "Pending" },
         nota: "",
       });
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
       propuesta: { importe: number } | null;
     };
     expect(res.propuesta?.importe).toBe(40);
@@ -150,7 +153,7 @@ describe("ejecutarJob", () => {
   it("registrar_gasto: acepta propuesta null con nota cuando falta info", async () => {
     const j = job({ tipo: "registrar_gasto", payload: { peticion: "registra un gasto en comida" } });
     const invocar = async () => JSON.stringify({ propuesta: null, nota: "¿De cuánto fue el gasto?" });
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
       propuesta: null;
       nota: string;
     };
@@ -165,7 +168,7 @@ describe("ejecutarJob", () => {
         propuesta: { nombre: "Salario", importe: 1500, categoria: "Salario", tipo: "Ingreso Fijo", fecha: "2026-06-23", estado: "Pending" },
         nota: "",
       });
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
       propuesta: { tipo: string } | null;
     };
     expect(res.propuesta?.tipo).toBe("Ingreso Fijo");
@@ -178,7 +181,7 @@ describe("ejecutarJob", () => {
         propuesta: { concepto: "Préstamo", persona: "Leo", valor: 50, movimiento: "deuda", fecha: "2026-06-23" },
         nota: "",
       });
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
       propuesta: { persona: string; valor: number } | null;
     };
     expect(res.propuesta).toMatchObject({ persona: "Leo", valor: 50 });
@@ -191,7 +194,7 @@ describe("ejecutarJob", () => {
       promptVisto = p;
       return JSON.stringify({ movimiento: { id: "pg1", nombre: "Luz", importe: 30 }, nota: "" });
     };
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
       movimiento: { id: string } | null;
     };
     expect(promptVisto).toContain("id:pg1 | Luz"); // se le pasó la lista de pendientes
@@ -209,7 +212,7 @@ describe("ejecutarJob", () => {
         nota: "",
       });
     };
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
       accion: string;
       propuesta: { importe: number } | null;
     };
@@ -217,6 +220,34 @@ describe("ejecutarJob", () => {
     expect(promptVisto).toContain("id:pg1 | Luz"); // lista de pendientes
     expect(res.accion).toBe("gasto");
     expect(res.propuesta?.importe).toBe(40);
+  });
+
+  it("asistente: clasifica como borrar y devuelve el objetivo (con borrables en el prompt)", async () => {
+    const j = job({ tipo: "asistente", payload: { mensaje: "borra el préstamo de Leo" } });
+    let promptVisto = "";
+    const invocar = async (p: string) => {
+      promptVisto = p;
+      return JSON.stringify({ accion: "borrar", objetivo: { tipo: "deuda", id: "bd1", nombre: "Préstamo" }, nota: "" });
+    };
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
+      accion: string;
+      objetivo: { id: string; tipo: string } | null;
+    };
+    expect(promptVisto).toContain("MOVIMIENTOS Y DEUDAS"); // se le pasó la lista de borrables
+    expect(promptVisto).toContain("id:bd1");
+    expect(res.accion).toBe("borrar");
+    expect(res.objetivo).toMatchObject({ tipo: "deuda", id: "bd1" });
+  });
+
+  it("asistente: borrar acepta objetivo null con nota cuando no hay match", async () => {
+    const j = job({ tipo: "asistente", payload: { mensaje: "borra eso" } });
+    const invocar = async () => JSON.stringify({ accion: "borrar", objetivo: null, nota: "¿Cuál exactamente?" });
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
+      accion: string;
+      objetivo: null;
+    };
+    expect(res.accion).toBe("borrar");
+    expect(res.objetivo).toBeNull();
   });
 
   it("asistente: puede pedir aclaración con opciones tipadas", async () => {
@@ -230,7 +261,7 @@ describe("ejecutarJob", () => {
           { etiqueta: "Marcar la luz como pagada", accion: "pagado" },
         ],
       });
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as {
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
       accion: string;
       opciones: { accion: string }[];
     };
@@ -247,7 +278,7 @@ describe("ejecutarJob", () => {
         pregunta: "¿?",
         opciones: [{ etiqueta: "Algo raro", accion: "borrar_todo" }],
       });
-    await expect(ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })).rejects.toThrow();
+    await expect(ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })).rejects.toThrow();
   });
 
   it("proponer_contexto: acepta JSON con fences y borradores", async () => {
@@ -256,7 +287,7 @@ describe("ejecutarJob", () => {
       "```json\n" +
       JSON.stringify({ borradores: [{ tipo: "proveedor", titulo: "Naturgy", contenido: "Compañía de gas", tags: ["gas"] }] }) +
       "\n```";
-    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes })) as { borradores: unknown[] };
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as { borradores: unknown[] };
     expect(res.borradores).toHaveLength(1);
   });
 });
@@ -274,7 +305,7 @@ describe("drenarCola", () => {
   it("procesa un job y lo cierra como ok", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job()).mockResolvedValueOnce(null);
     const invocar = async () => JSON.stringify({ respuesta: "ok", fuentes: [] });
-    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes });
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes, borrables });
     expect(r).toMatchObject({ procesados: 1, ok: 1, reintentos: 0, errores: 0 });
     expect(marcarMock).toHaveBeenCalledWith(
       "j1",
@@ -286,7 +317,7 @@ describe("drenarCola", () => {
   it("re-encola (backoff) si falla y quedan intentos", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job({ intentos: 1 })).mockResolvedValueOnce(null);
     const invocar = async () => "{ esto no es json";
-    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes }, 3);
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes, borrables }, 3);
     expect(r.reintentos).toBe(1);
     expect(reintentarMock).toHaveBeenCalledWith("j1", expect.any(Number), expect.any(String));
     expect(marcarMock).not.toHaveBeenCalled();
@@ -297,7 +328,7 @@ describe("drenarCola", () => {
     const invocar = async () => {
       throw new CuotaAgotadaError("3:45pm");
     };
-    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes }, 3);
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes, borrables }, 3);
     expect(r.errores).toBe(1);
     expect(r.reintentos).toBe(0);
     expect(reintentarMock).not.toHaveBeenCalled();
@@ -311,7 +342,7 @@ describe("drenarCola", () => {
   it("marca error terminal al agotar los intentos", async () => {
     tomarSiguienteMock.mockResolvedValueOnce(job({ intentos: 3 })).mockResolvedValueOnce(null);
     const invocar = async () => "{ esto no es json";
-    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes }, 3);
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes, borrables }, 3);
     expect(r.errores).toBe(1);
     expect(marcarMock).toHaveBeenCalledWith("j1", "error", expect.objectContaining({ error: expect.any(String) }));
     expect(reintentarMock).not.toHaveBeenCalled();
