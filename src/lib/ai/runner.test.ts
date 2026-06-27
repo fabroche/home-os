@@ -18,6 +18,7 @@ vi.mock("@/lib/ai/jobs", () => ({
 }));
 
 import { construirPrompt, extraerJson, ejecutarJob, drenarCola, backoffMs } from "@/lib/ai/runner";
+import { CuotaAgotadaError, MARCADOR_CUOTA } from "@/lib/ai/errors";
 
 const job = (over: Partial<AiJob> = {}): AiJob => ({
   id: "j1",
@@ -267,6 +268,22 @@ describe("drenarCola", () => {
     expect(r.reintentos).toBe(1);
     expect(reintentarMock).toHaveBeenCalledWith("j1", expect.any(Number), expect.any(String));
     expect(marcarMock).not.toHaveBeenCalled();
+  });
+
+  it("cuota agotada: NO reintenta aunque queden intentos; error terminal con marcador", async () => {
+    tomarSiguienteMock.mockResolvedValueOnce(job({ intentos: 1 })).mockResolvedValueOnce(null);
+    const invocar = async () => {
+      throw new CuotaAgotadaError("3:45pm");
+    };
+    const r = await drenarCola({ invocar, recuperar, listar, finanzas, pendientes }, 3);
+    expect(r.errores).toBe(1);
+    expect(r.reintentos).toBe(0);
+    expect(reintentarMock).not.toHaveBeenCalled();
+    expect(marcarMock).toHaveBeenCalledWith(
+      "j1",
+      "error",
+      expect.objectContaining({ error: expect.stringContaining(MARCADOR_CUOTA) }),
+    );
   });
 
   it("marca error terminal al agotar los intentos", async () => {
