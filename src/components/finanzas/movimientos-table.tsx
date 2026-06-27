@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import type { Movimiento } from "@/types/finanzas";
 import { EstadoToggle } from "@/components/finanzas/estado-toggle";
 import { ArchivosCell } from "@/components/finanzas/archivos-cell";
+import { BorrarButton } from "@/components/finanzas/borrar-button";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -132,6 +133,9 @@ export function MovimientosTable({ movimientos }: { movimientos: Movimiento[] })
               <Th sortable field="importe" current={sortField} dir={sortDir} onSort={toggleSort} align="right">
                 Importe
               </Th>
+              <th className="px-4 py-2.5 font-medium">
+                <span className="sr-only">Acciones</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -149,11 +153,14 @@ export function MovimientosTable({ movimientos }: { movimientos: Movimiento[] })
                 <td className={`px-4 py-2.5 text-right nums font-medium ${COLOR_FLUJO[m.flujo] ?? ""}`} data-label="Importe">
                   {m.importe != null ? eur(m.importe) : "—"}
                 </td>
+                <td className="px-4 py-2.5 text-right max-md:text-left" data-label="Acciones">
+                  <BorrarButton tipo="movimiento" pageId={m.notionPageId} nombre={m.nombre || "movimiento"} />
+                </td>
               </tr>
             ))}
             {filtradas.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
                   {movimientos.length === 0 ? "Sin movimientos." : "Ningún movimiento con esos filtros."}
                 </td>
               </tr>

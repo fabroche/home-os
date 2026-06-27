@@ -8,7 +8,8 @@ import {
   syncDeudaById,
 } from "@/lib/notion/sync/finanzas";
 import { PRESUPUESTO, DEUDAS } from "@/lib/notion/schema";
-import { createPageInDb, updatePageProps, retrievePage } from "@/lib/notion/mutations";
+import { createPageInDb, updatePageProps, retrievePage, archivePage } from "@/lib/notion/mutations";
+import { softDeleteMovimiento, softDeleteDeuda } from "@/lib/services/finanzas";
 import { toMovimiento } from "@/lib/notion/mappers/presupuesto";
 import {
   writeTitle,
@@ -145,6 +146,38 @@ export async function crearDeuda(input: unknown): Promise<WriteResult> {
     return { ok: true, id: page.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Error al crear la deuda." };
+  }
+}
+
+/**
+ * Borra un movimiento: lo archiva en Notion (fuente de verdad, reversible) y refleja
+ * el borrado en el espejo de Supabase al instante (soft-delete). La IA nunca borra:
+ * esto solo se llama tras confirmación explícita del usuario.
+ */
+export async function borrarMovimiento(pageId: string): Promise<WriteResult> {
+  if (!pageId) return { ok: false, error: "Falta el movimiento." };
+  try {
+    await requireUser();
+    await archivePage(pageId);
+    await softDeleteMovimiento(pageId);
+    revalidatePath("/finanzas");
+    return { ok: true, id: pageId };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al borrar el movimiento." };
+  }
+}
+
+/** Borra una deuda/pago: archiva en Notion + soft-delete en Supabase. Tras confirmación. */
+export async function borrarDeuda(pageId: string): Promise<WriteResult> {
+  if (!pageId) return { ok: false, error: "Falta la deuda." };
+  try {
+    await requireUser();
+    await archivePage(pageId);
+    await softDeleteDeuda(pageId);
+    revalidatePath("/finanzas");
+    return { ok: true, id: pageId };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al borrar la deuda." };
   }
 }
 
