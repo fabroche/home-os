@@ -186,7 +186,14 @@ export const AsistenteOutputSchema = z.discriminatedUnion("accion", [
   z.object({ accion: z.literal("ingreso"), propuesta: CrearMovimientoInputSchema.nullable(), nota: NotaSchema }),
   z.object({ accion: z.literal("deuda"), propuesta: CrearDeudaInputSchema.nullable(), nota: NotaSchema }),
   z.object({ accion: z.literal("pagado"), movimiento: MovimientoElegidoSchema.nullable(), nota: NotaSchema }),
-  z.object({ accion: z.literal("borrar"), objetivo: ObjetivoBorrarSchema.nullable(), nota: NotaSchema }),
+  z.object({
+    accion: z.literal("borrar"),
+    objetivo: ObjetivoBorrarSchema.nullable(),
+    // Cuando varios encajan (ej. "un gasto de comida"), la IA los lista para que el
+    // usuario elija; entonces objetivo va null. Si solo uno encaja claro, va en objetivo.
+    candidatos: z.array(ObjetivoBorrarSchema).max(8).default([]),
+    nota: NotaSchema,
+  }),
   z.object({ accion: z.literal("contexto"), borradores: z.array(BorradorContextoSchema).min(1).max(5) }),
   z.object({
     accion: z.literal("aclarar"),

@@ -114,10 +114,11 @@ export function ChatPanel({
                 resueltoInicial={m.accionResuelta}
                 onResuelto={(estado) => onResuelto?.(m.id, estado)}
               />
-            ) : m.borrarObjetivo ? (
+            ) : m.borrarObjetivo || m.borrarCandidatos ? (
               <BorrarCard
                 key={m.id}
                 objetivo={m.borrarObjetivo}
+                candidatos={m.borrarCandidatos}
                 resueltoInicial={m.accionResuelta}
                 onResuelto={(estado) => onResuelto?.(m.id, estado)}
               />
