@@ -15,8 +15,10 @@ import { NuevoMovimiento } from "@/components/finanzas/nuevo-movimiento";
 import { NuevaDeuda } from "@/components/finanzas/nueva-deuda";
 import { NuevaCuenta } from "@/components/finanzas/nueva-cuenta";
 import { NuevaTarjeta } from "@/components/finanzas/nueva-tarjeta";
+import { NuevoPlanCuotas } from "@/components/finanzas/nuevo-plan-cuotas";
 import { BorrarButton } from "@/components/finanzas/borrar-button";
 import { listCuentas, listTarjetas } from "@/lib/services/cuentas";
+import { listPlanes } from "@/lib/services/cuotas";
 import { Card, CardLabel } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedNumber } from "@/components/ui/count-up";
@@ -54,12 +56,13 @@ function Kpi({
 }
 
 export default async function FinanzasPage() {
-  const [movimientos, deudas, lastSync, cuentas, tarjetas] = await Promise.all([
+  const [movimientos, deudas, lastSync, cuentas, tarjetas, planes] = await Promise.all([
     listMovimientos(),
     listDeudas(),
     ultimoSync(),
     listCuentas(),
     listTarjetas(),
+    listPlanes(),
   ]);
   const r = resumen(movimientos);
   const porCat = gastosPorCategoria(movimientos);
@@ -308,6 +311,48 @@ export default async function FinanzasPage() {
               <BarList items={gastoPersona.map((g) => ({ label: g.persona, value: g.total }))} format={eur} />
             </Card>
           )}
+        </section>
+      </Reveal>
+
+      {/* Gastos a plazos */}
+      <Reveal id="fin-plazos">
+        <section className="mt-10">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Gastos a plazos</h2>
+            <NuevoPlanCuotas
+              tarjetas={tarjetas.map((t) => ({ id: t.id, nombre: t.nombre }))}
+              personas={personasDeuda}
+            />
+          </div>
+          <Card>
+            {planes.length > 0 ? (
+              <ul className="space-y-3">
+                {planes.map((p) => {
+                  const cuota = Math.round((p.montoTotal / p.numCuotas) * 100) / 100;
+                  const tarjeta = tarjetas.find((t) => t.id === p.tarjetaId)?.nombre;
+                  return (
+                    <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-medium">
+                        {p.concepto}
+                        {tarjeta && <span className="font-normal text-muted-foreground"> · {tarjeta}</span>}
+                        {p.persona && <span className="font-normal text-muted-foreground"> · {p.persona}</span>}
+                      </span>
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <span className="nums">
+                          {p.cuotasGeneradas}/{p.numCuotas} · {eur(cuota)}/mes
+                        </span>
+                        {p.estado === "completado" && <Badge tone="income">Completado</Badge>}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Sin planes a plazos. Crea uno para financiar una compra en cuotas.
+              </p>
+            )}
+          </Card>
         </section>
       </Reveal>
 
