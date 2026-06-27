@@ -1,4 +1,5 @@
 import type { Movimiento, Deuda } from "@/types/finanzas";
+import type { Cuenta, Tarjeta } from "@/types/cuentas";
 
 /**
  * Agregaciones PURAS sobre movimientos (sin I/O ni server-only → testeable).
@@ -114,4 +115,55 @@ export function resumenDeudas(deudas: Deuda[]): DeudasResumen {
   porCobrar.sort((a, b) => b.total - a.total);
 
   return { total, totalPorCobrar, porPersona, porCobrar };
+}
+
+// === Cuentas / tarjetas / persona (modelo nativo) ===========================
+
+export type SaldoCuenta = { cuenta: Cuenta; balance: number };
+
+/** Balance por cuenta = saldo inicial + suma firmada de los movimientos de esa cuenta. */
+export function balancePorCuenta(movs: Movimiento[], cuentas: Cuenta[]): SaldoCuenta[] {
+  return cuentas.map((cuenta) => {
+    const suma = movs
+      .filter((m) => m.cuentaId === cuenta.id)
+      .reduce((acc, m) => acc + (m.importe ?? 0), 0);
+    return { cuenta, balance: cuenta.saldoInicial + suma };
+  });
+}
+
+export type APagarTarjeta = { tarjeta: Tarjeta; total: number };
+
+/**
+ * Cuánto se pagará de cada tarjeta de CRÉDITO = magnitud de sus cargos (gastos) aún
+ * PENDIENTES. Al marcarlos pagados (o registrar el pago del extracto) dejan de sumar.
+ */
+export function aPagarPorTarjeta(movs: Movimiento[], tarjetas: Tarjeta[]): APagarTarjeta[] {
+  return tarjetas
+    .filter((t) => t.tipo === "credito")
+    .map((tarjeta) => {
+      const total = movs
+        .filter((m) => m.tarjetaId === tarjeta.id && m.flujo === "gasto" && m.estado === "Pending")
+        .reduce((acc, m) => acc + Math.abs(m.importe ?? 0), 0);
+      return { tarjeta, total };
+    });
+}
+
+export type GastoPersona = { persona: string; total: number };
+
+/**
+ * Gasto (magnitud) por persona, de mayor a menor. Si se pasa `tarjetaId`, solo cuenta los
+ * cargos de esa tarjeta (la descomposición de una tarjeta compartida). Ignora sin persona.
+ */
+export function gastoPorPersona(movs: Movimiento[], tarjetaId?: string): GastoPersona[] {
+  const acc = new Map<string, number>();
+  for (const m of movs) {
+    if (m.flujo !== "gasto") continue;
+    if (tarjetaId && m.tarjetaId !== tarjetaId) continue;
+    const persona = m.persona?.trim();
+    if (!persona) continue;
+    acc.set(persona, (acc.get(persona) ?? 0) + Math.abs(m.importe ?? 0));
+  }
+  return [...acc.entries()]
+    .map(([persona, total]) => ({ persona, total }))
+    .sort((a, b) => b.total - a.total);
 }
