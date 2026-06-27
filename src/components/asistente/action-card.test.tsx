@@ -48,6 +48,18 @@ describe("ActionCard", () => {
     expect(crearMovimiento).not.toHaveBeenCalled();
   });
 
+  it("nace congelada si llega con resueltoInicial (rehidratación)", () => {
+    render(<ActionCard propuesta={propuesta} resueltoInicial="creado" />);
+    expect(screen.getByText(/^Gasto creado/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /confirmar y crear/i })).not.toBeInTheDocument();
+  });
+
+  it("muestra 'reescribiste' si fue superada por un mensaje posterior", () => {
+    render(<ActionCard propuesta={propuesta} resueltoInicial="superado" />);
+    expect(screen.getByText(/lo reescribiste/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /confirmar y crear/i })).not.toBeInTheDocument();
+  });
+
   it("muestra el error si la creación falla", async () => {
     crearMovimiento.mockResolvedValue({ ok: false, error: "Notion no responde" });
     render(<ActionCard propuesta={propuesta} />);

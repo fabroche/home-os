@@ -9,8 +9,7 @@ import { Card, CardLabel } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-type Resuelto = "creado" | "cancelado";
+import type { AccionResuelta } from "@/components/asistente/chat-message";
 
 /**
  * Tarjeta de acción del Asistente (M6 · tool calling): la IA **propone** un alta de
@@ -20,13 +19,18 @@ type Resuelto = "creado" | "cancelado";
  */
 export function DeudaCard({
   propuesta,
+  resueltoInicial,
   onResuelto,
 }: {
   propuesta: CrearDeudaInput;
-  onResuelto?: (estado: Resuelto) => void;
+  /** Estado resuelto persistido (al rehidratar): si está, la card nace congelada. */
+  resueltoInicial?: AccionResuelta;
+  onResuelto?: (estado: AccionResuelta) => void;
 }) {
   const [form, setForm] = useState<CrearDeudaInput>(propuesta);
-  const [resuelto, setResuelto] = useState<Resuelto | null>(null);
+  // Resuelto efectivo = lo decidido aquí (local) o lo persistido/superado que llega por prop.
+  const [resueltoLocal, setResueltoLocal] = useState<AccionResuelta | null>(null);
+  const resuelto = resueltoLocal ?? resueltoInicial ?? null;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +43,7 @@ export function DeudaCard({
     startTransition(async () => {
       const res = await crearDeuda(form);
       if (res.ok) {
-        setResuelto("creado");
+        setResueltoLocal("creado");
         onResuelto?.("creado");
       } else {
         setError(res.error);
@@ -48,11 +52,16 @@ export function DeudaCard({
   }
 
   if (resuelto) {
+    const etiqueta =
+      resuelto === "creado"
+        ? "Registrado"
+        : resuelto === "superado"
+          ? "Descartado (lo reescribiste)"
+          : "Cancelado";
     return (
       <Card className="flex items-center gap-2 text-sm text-muted-foreground">
         <Check className="size-4 text-income" />
-        {resuelto === "creado" ? "Registrado" : "Cancelado"}:{" "}
-        <span className="font-medium text-foreground">{form.concepto}</span>
+        {etiqueta}: <span className="font-medium text-foreground">{form.concepto}</span>
       </Card>
     );
   }
@@ -137,7 +146,7 @@ export function DeudaCard({
           size="sm"
           disabled={pending}
           onClick={() => {
-            setResuelto("cancelado");
+            setResueltoLocal("cancelado");
             onResuelto?.("cancelado");
           }}
         >

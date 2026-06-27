@@ -6,8 +6,8 @@ import { cambiarEstadoMovimiento } from "@/lib/actions/finanzas";
 import { Card, CardLabel } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { AccionResuelta } from "@/components/asistente/chat-message";
 
-type Resuelto = "pagado" | "cancelado";
 export type MovimientoAPagar = { id: string; nombre: string; importe: number };
 
 /**
@@ -18,12 +18,17 @@ export type MovimientoAPagar = { id: string; nombre: string; importe: number };
  */
 export function MarcarPagadoCard({
   movimiento,
+  resueltoInicial,
   onResuelto,
 }: {
   movimiento: MovimientoAPagar;
-  onResuelto?: (estado: Resuelto) => void;
+  /** Estado resuelto persistido (al rehidratar): si está, la card nace congelada. */
+  resueltoInicial?: AccionResuelta;
+  onResuelto?: (estado: AccionResuelta) => void;
 }) {
-  const [resuelto, setResuelto] = useState<Resuelto | null>(null);
+  // Resuelto efectivo = lo decidido aquí (local) o lo persistido/superado que llega por prop.
+  const [resueltoLocal, setResueltoLocal] = useState<AccionResuelta | null>(null);
+  const resuelto = resueltoLocal ?? resueltoInicial ?? null;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +37,7 @@ export function MarcarPagadoCard({
     startTransition(async () => {
       const res = await cambiarEstadoMovimiento(movimiento.id, "Done");
       if (res.ok) {
-        setResuelto("pagado");
+        setResueltoLocal("pagado");
         onResuelto?.("pagado");
       } else {
         setError(res.error);
@@ -41,11 +46,16 @@ export function MarcarPagadoCard({
   }
 
   if (resuelto) {
+    const etiqueta =
+      resuelto === "pagado"
+        ? "Marcado como pagado"
+        : resuelto === "superado"
+          ? "Descartado (lo reescribiste)"
+          : "Cancelado";
     return (
       <Card className="flex items-center gap-2 text-sm text-muted-foreground">
         <Check className="size-4 text-income" />
-        {resuelto === "pagado" ? "Marcado como pagado" : "Cancelado"}:{" "}
-        <span className="font-medium text-foreground">{movimiento.nombre}</span>
+        {etiqueta}: <span className="font-medium text-foreground">{movimiento.nombre}</span>
       </Card>
     );
   }
@@ -71,7 +81,7 @@ export function MarcarPagadoCard({
           size="sm"
           disabled={pending}
           onClick={() => {
-            setResuelto("cancelado");
+            setResueltoLocal("cancelado");
             onResuelto?.("cancelado");
           }}
         >

@@ -6,6 +6,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 const enviar = vi.fn();
 const registrar = vi.fn();
 const consultar = vi.fn();
+const crearMovimiento = vi.fn();
 vi.mock("@/lib/actions/ai", () => ({
   enviarAlAsistente: (...a: unknown[]) => enviar(...a),
   // Acciones dedicadas (las usa la desambiguación al elegir una opción).
@@ -20,10 +21,24 @@ vi.mock("@/lib/actions/ai", () => ({
 // SuggestionCard / ActionCard / DeudaCard / MarcarPagadoCard (vía ChatPanel) importan Server Actions.
 vi.mock("@/lib/actions/contexto", () => ({ guardarEntrada: vi.fn() }));
 vi.mock("@/lib/actions/finanzas", () => ({
-  crearMovimiento: vi.fn(),
+  crearMovimiento: (...a: unknown[]) => crearMovimiento(...a),
   crearDeuda: vi.fn(),
   cambiarEstadoMovimiento: vi.fn(),
 }));
+
+// Respuesta del router que propone un gasto (reutilizada en varios tests de tarjetas).
+const PROPUESTA_GASTO = {
+  estado: "ok",
+  tipo: "registrar_gasto",
+  propuesta: {
+    nombre: "Café",
+    importe: 2.5,
+    categoria: "Restaurantes",
+    tipo: "Gasto Variable",
+    fecha: "2026-06-23",
+    estado: "Pending",
+  },
+} as const;
 
 import { ChatBubble } from "@/components/asistente/chat-bubble";
 
@@ -31,6 +46,7 @@ beforeEach(() => {
   enviar.mockReset();
   registrar.mockReset();
   consultar.mockReset();
+  crearMovimiento.mockReset();
   sessionStorage.clear();
 });
 
@@ -151,6 +167,58 @@ describe("ChatBubble", () => {
     render(<ChatBubble defaultOpen />);
     await waitFor(() => expect(screen.getByText("Balance: 100 €")).toBeInTheDocument());
     expect(screen.getByText("balance?")).toBeInTheDocument();
+  });
+
+  it("una tarjeta confirmada sigue resuelta (no interactuable) al reabrir", async () => {
+    enviar.mockResolvedValue({ ok: true, jobId: "jg" });
+    consultar.mockResolvedValue(PROPUESTA_GASTO);
+    crearMovimiento.mockResolvedValue({ ok: true, id: "m1" });
+
+    const { unmount } = render(<ChatBubble defaultOpen pollMs={5} />);
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
+      target: { value: "apúntame un café de 2,5€" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => expect(screen.getByText(/registrar gasto/i)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /confirmar y crear/i }));
+    await waitFor(() => expect(screen.getByText(/^Gasto creado/)).toBeInTheDocument());
+
+    // Cerrar y reabrir (nueva instancia): la tarjeta se rehidrata CONGELADA.
+    unmount();
+    cleanup();
+    render(<ChatBubble defaultOpen pollMs={5} />);
+
+    await waitFor(() => expect(screen.getByText(/^Gasto creado/)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /confirmar y crear/i })).not.toBeInTheDocument();
+    // No se vuelve a escribir en Notion por la rehidratación.
+    expect(crearMovimiento).toHaveBeenCalledTimes(1);
+  });
+
+  it("escribir un mensaje nuevo supera la tarjeta pendiente sin resolver", async () => {
+    enviar.mockResolvedValue({ ok: true, jobId: "jg" });
+    // El primer sondeo propone el gasto; el segundo (tras reescribir) responde texto.
+    consultar
+      .mockResolvedValueOnce(PROPUESTA_GASTO)
+      .mockResolvedValue({ estado: "ok", tipo: "consulta_rag", respuesta: "Vale, anotado.", fuentes: [] });
+
+    render(<ChatBubble defaultOpen pollMs={5} />);
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
+      target: { value: "apúntame un café" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /confirmar y crear/i })).toBeInTheDocument());
+
+    // El usuario NO confirma: vuelve a escribir corrigiendo.
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
+      target: { value: "no, fue hace 2 días" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    // La tarjeta anterior queda congelada y deja de ser interactuable.
+    await waitFor(() => expect(screen.getByText(/lo reescribiste/i)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /confirmar y crear/i })).not.toBeInTheDocument();
+    expect(crearMovimiento).not.toHaveBeenCalled();
   });
 
   it("muestra el error si el job falla", async () => {

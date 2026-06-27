@@ -15,10 +15,18 @@ import {
   type EncolarResult,
 } from "@/lib/actions/ai";
 import { ChatPanel } from "@/components/asistente/chat-panel";
-import type { ChatMsg } from "@/components/asistente/chat-message";
+import type { ChatMsg, AccionResuelta } from "@/components/asistente/chat-message";
 import type { AccionAsistente } from "@/types/ai";
 
 const STORAGE_KEY = "homeos.chat.v1";
+
+/** Un mensaje que lleva una tarjeta de acción todavía sin resolver (interactuable). */
+function esCardSinResolver(m: ChatMsg): boolean {
+  return (
+    !m.accionResuelta &&
+    Boolean(m.propuestaGasto || m.propuestaDeuda || m.movimientoPagar || m.borrador || m.aclarar)
+  );
+}
 
 /**
  * Burbuja de chat del Asistente (M6 · F-M6-5/6). FAB flotante que abre el panel; encola
@@ -111,6 +119,13 @@ export function ChatBubble({
   const actualizar = useCallback((id: string, patch: Partial<ChatMsg>) => {
     setMessages((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   }, []);
+
+  // Persiste el estado final de una tarjeta (creado/pagado/cancelado/…) en su mensaje, para
+  // que al reabrir/recargar NO vuelva a ser interactuable (se rehidrata congelada).
+  const onCardResuelto = useCallback(
+    (id: string, estado: AccionResuelta) => actualizar(id, { accionResuelta: estado }),
+    [actualizar],
+  );
 
   // Sondea un job hasta que cierre (ok/error) o se agote la ventana. Idempotente por
   // jobId vía `activos`: si el tope se alcanza sin respuesta, deja el mensaje pendiente
@@ -274,9 +289,15 @@ export function ChatBubble({
     [actualizar],
   );
 
-  // Todo mensaje va al router: el modelo clasifica la intención (o pide aclarar).
+  // Todo mensaje va al router: el modelo clasifica la intención (o pide aclarar). Antes de
+  // lanzar, **supera** cualquier tarjeta pendiente sin resolver: si el usuario vuelve a
+  // escribir (p. ej. "no, fue hace 2 días") esa propuesta queda congelada y no se puede
+  // confirmar por error (evita duplicados y cards "zombi" al reabrir).
   const onSend = useCallback(
     (texto: string) => {
+      setMessages((ms) =>
+        ms.map((m) => (esCardSinResolver(m) ? { ...m, accionResuelta: "superado" as const } : m)),
+      );
       void lanzarJob(() => enviarAlAsistente({ mensaje: texto }), { userMsg: texto, mensajeOrigen: texto });
     },
     [lanzarJob],
@@ -320,6 +341,7 @@ export function ChatBubble({
             pending={pending}
             onSend={onSend}
             onElegirAccion={onElegirAccion}
+            onResuelto={onCardResuelto}
             onClose={() => setOpen(false)}
           />
         )}
