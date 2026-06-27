@@ -14,8 +14,21 @@ function hoy() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Alta de un movimiento (gasto/ingreso) que se escribe en Notion. */
-export function NuevoMovimiento() {
+const SIN = "__sin__";
+
+/**
+ * Alta de un movimiento (gasto/ingreso), nativo en Supabase. Etiquetado opcional con
+ * cuenta, tarjeta y persona (la persona habilita la atribución en tarjetas compartidas).
+ */
+export function NuevoMovimiento({
+  cuentas = [],
+  tarjetas = [],
+  personas = [],
+}: {
+  cuentas?: { id: string; nombre: string }[];
+  tarjetas?: { id: string; nombre: string }[];
+  personas?: string[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -28,10 +41,16 @@ export function NuevoMovimiento() {
   const [categoria, setCategoria] = useState<(typeof CATEGORIAS)[number]>("Casa");
   const [fecha, setFecha] = useState(hoy());
   const [estado, setEstado] = useState<(typeof ESTADOS)[number]>("Pending");
+  const [cuentaId, setCuentaId] = useState<string>(SIN);
+  const [tarjetaId, setTarjetaId] = useState<string>(SIN);
+  const [persona, setPersona] = useState("");
 
   function reset() {
     setNombre("");
     setImporte("");
+    setCuentaId(SIN);
+    setTarjetaId(SIN);
+    setPersona("");
     setErrors({});
     setFormError(null);
   }
@@ -48,6 +67,9 @@ export function NuevoMovimiento() {
         categoria,
         fecha,
         estado,
+        cuentaId: cuentaId === SIN ? null : cuentaId,
+        tarjetaId: tarjetaId === SIN ? null : tarjetaId,
+        persona: persona.trim() || null,
       });
       if (res.ok) {
         reset();
@@ -136,6 +158,40 @@ export function NuevoMovimiento() {
                 </option>
               ))}
             </Select>
+          </Field>
+          <Field label="Cuenta" htmlFor="mov-cuenta">
+            <Select id="mov-cuenta" value={cuentaId} onChange={(e) => setCuentaId(e.target.value)}>
+              <option value={SIN}>— Sin cuenta —</option>
+              {cuentas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Tarjeta" htmlFor="mov-tarjeta">
+            <Select id="mov-tarjeta" value={tarjetaId} onChange={(e) => setTarjetaId(e.target.value)}>
+              <option value={SIN}>— Sin tarjeta —</option>
+              {tarjetas.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Persona" htmlFor="mov-persona">
+            <Input
+              id="mov-persona"
+              value={persona}
+              onChange={(e) => setPersona(e.target.value)}
+              list="personas-mov"
+              placeholder="¿De quién fue? (opcional)"
+            />
+            <datalist id="personas-mov">
+              {personas.map((p) => (
+                <option key={p} value={p} />
+              ))}
+            </datalist>
           </Field>
         </div>
 

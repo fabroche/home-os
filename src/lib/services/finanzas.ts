@@ -33,6 +33,9 @@ type MovimientoRow = {
   tipo: string | null;
   estado: string | null;
   flujo: string;
+  cuenta_id: string | null;
+  tarjeta_id: string | null;
+  persona: string | null;
   facturas: string[] | null;
   comprobantes: string[] | null;
   url: string | null;
@@ -62,6 +65,9 @@ function rowToMovimiento(r: MovimientoRow): Movimiento {
     categoria: r.categoria,
     tipo: r.tipo,
     estado: r.estado,
+    cuentaId: r.cuenta_id,
+    tarjetaId: r.tarjeta_id,
+    persona: r.persona,
     facturas: r.facturas ?? [],
     comprobantes: r.comprobantes ?? [],
     flujo: r.flujo,
@@ -123,6 +129,9 @@ export async function crearMovimientoNativo(d: CrearMovimientoInput, userId: str
       tipo: d.tipo,
       estado: d.estado,
       flujo,
+      cuenta_id: d.cuentaId ?? null,
+      tarjeta_id: d.tarjetaId ?? null,
+      persona: d.persona?.trim() || null,
       facturas: [],
       comprobantes: [],
       ultima_edicion: now,
