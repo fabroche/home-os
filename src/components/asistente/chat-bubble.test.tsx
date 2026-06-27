@@ -24,6 +24,8 @@ vi.mock("@/lib/actions/finanzas", () => ({
   crearMovimiento: (...a: unknown[]) => crearMovimiento(...a),
   crearDeuda: vi.fn(),
   cambiarEstadoMovimiento: vi.fn(),
+  borrarMovimiento: vi.fn(),
+  borrarDeuda: vi.fn(),
 }));
 
 // Respuesta del router que propone un gasto (reutilizada en varios tests de tarjetas).
@@ -248,6 +250,25 @@ describe("ChatBubble", () => {
     expect(segunda.mensaje).toBe("no, fue hace 2 días");
     expect(segunda.historial).toBeDefined();
     expect(JSON.stringify(segunda.historial)).toContain("Propuse registrar un gasto");
+  });
+
+  it("el router propone un borrado y muestra la tarjeta de confirmación", async () => {
+    enviar.mockResolvedValue({ ok: true, jobId: "jb" });
+    consultar.mockResolvedValue({
+      estado: "ok",
+      tipo: "borrar",
+      objetivo: { tipo: "deuda", id: "bd1", nombre: "Préstamo a Leo" },
+    });
+
+    render(<ChatBubble defaultOpen pollMs={5} />);
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
+      target: { value: "borra el préstamo de Leo" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => expect(screen.getByText(/borrar deuda/i)).toBeInTheDocument());
+    expect(screen.getByText("Préstamo a Leo")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sí, borrar/i })).toBeInTheDocument();
   });
 
   it("muestra el error si el job falla", async () => {

@@ -24,7 +24,9 @@ const STORAGE_KEY = "homeos.chat.v1";
 function esCardSinResolver(m: ChatMsg): boolean {
   return (
     !m.accionResuelta &&
-    Boolean(m.propuestaGasto || m.propuestaDeuda || m.movimientoPagar || m.borrador || m.aclarar)
+    Boolean(
+      m.propuestaGasto || m.propuestaDeuda || m.movimientoPagar || m.borrarObjetivo || m.borrador || m.aclarar,
+    )
   );
 }
 
@@ -48,6 +50,10 @@ function turnoDeMensaje(m: ChatMsg): TurnoConversacion | null {
   if (m.movimientoPagar) {
     const p = m.movimientoPagar;
     return { rol: "assistant", texto: `Propuse marcar como pagado: "${p.nombre}" (${p.importe}€).` };
+  }
+  if (m.borrarObjetivo) {
+    const o = m.borrarObjetivo;
+    return { rol: "assistant", texto: `Propuse borrar ${o.tipo}: "${o.nombre}".` };
   }
   if (m.borrador) return { rol: "assistant", texto: `Propuse guardar en el banco de contexto: "${m.borrador.titulo}".` };
   if (m.aclarar) return { rol: "assistant", texto: `Pedí aclaración: ${m.aclarar.pregunta}` };
@@ -234,6 +240,21 @@ export function ChatBubble({
               setMessages((ms) => [
                 ...ms,
                 { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", movimientoPagar: mov },
+              ]);
+            }
+          } else if (st.tipo === "borrar") {
+            const obj = st.objetivo;
+            actualizar(aMsgId, {
+              contenido: obj
+                ? "¿Confirmas el borrado?"
+                : st.nota || "No tengo claro qué borrar. ¿Me dices cuál?",
+              pendiente: false,
+              jobId: undefined,
+            });
+            if (obj) {
+              setMessages((ms) => [
+                ...ms,
+                { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", borrarObjetivo: obj },
               ]);
             }
           } else if (st.tipo === "aclarar") {
