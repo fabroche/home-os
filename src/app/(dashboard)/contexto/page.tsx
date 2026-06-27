@@ -12,7 +12,7 @@ export default async function ContextoPage() {
 
   return (
     <main className="container-app max-w-4xl py-12">
-      <Reveal>
+      <Reveal id="contexto-header">
         <h1 className="text-4xl">
           Banco de <span className="serif-accent text-primary">contexto</span>
         </h1>
