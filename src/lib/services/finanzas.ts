@@ -84,6 +84,28 @@ export async function listDeudas(): Promise<Deuda[]> {
   return (data as DeudaRow[]).map(rowToDeuda);
 }
 
+/**
+ * Soft-delete del espejo en Supabase (deleted_at = ahora). Refleja al instante un
+ * borrado/archivado en Notion sin esperar al sync por cron; la UI ya solo lee activos.
+ */
+export async function softDeleteMovimiento(pageId: string): Promise<void> {
+  const sb = createSupabaseServiceClient();
+  const { error } = await sb
+    .from("movimiento")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("notion_page_id", pageId);
+  if (error) throw new Error(`softDeleteMovimiento: ${error.message}`);
+}
+
+export async function softDeleteDeuda(pageId: string): Promise<void> {
+  const sb = createSupabaseServiceClient();
+  const { error } = await sb
+    .from("deuda")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("notion_page_id", pageId);
+  if (error) throw new Error(`softDeleteDeuda: ${error.message}`);
+}
+
 /** Marca de la última sincronización Notion→Supabase (la más reciente entre fuentes). */
 export async function ultimoSync(): Promise<string | null> {
   const sb = createSupabaseServiceClient();

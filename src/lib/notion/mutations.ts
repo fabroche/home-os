@@ -39,6 +39,15 @@ export async function createPageInDb(
   return page as PageObjectResponse;
 }
 
+/**
+ * Archiva una página (la manda a la papelera de Notion). Es el "borrado" del modelo
+ * híbrido: reversible desde Notion y, al desaparecer de las queries, el sync deja de
+ * traerla. La query de la DB no devuelve archivadas, así no reaparece.
+ */
+export async function archivePage(pageId: string): Promise<void> {
+  await nq(() => notion.pages.update({ page_id: pageId, archived: true } as UpdatePageParameters));
+}
+
 /** Recupera una página por id (para re-sincronizar tras escribir). */
 export async function retrievePage(pageId: string): Promise<PageObjectResponse> {
   const page = await nq(() => notion.pages.retrieve({ page_id: pageId }));

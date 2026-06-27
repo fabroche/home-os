@@ -6,6 +6,7 @@ import { SyncButton } from "@/components/finanzas/sync-button";
 import { MovimientosTable } from "@/components/finanzas/movimientos-table";
 import { NuevoMovimiento } from "@/components/finanzas/nuevo-movimiento";
 import { NuevaDeuda } from "@/components/finanzas/nueva-deuda";
+import { BorrarButton } from "@/components/finanzas/borrar-button";
 import { Card, CardLabel } from "@/components/ui/card";
 import { AnimatedNumber } from "@/components/ui/count-up";
 import { Reveal } from "@/components/motion/reveal";
@@ -180,6 +181,9 @@ export default async function FinanzasPage() {
                     <th className="px-4 py-2.5 font-medium">Concepto</th>
                     <th className="px-4 py-2.5 font-medium">Persona</th>
                     <th className="px-4 py-2.5 text-right font-medium">Movimiento</th>
+                    <th className="px-4 py-2.5 font-medium">
+                      <span className="sr-only">Acciones</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -195,11 +199,14 @@ export default async function FinanzasPage() {
                       >
                         {d.valor != null ? eur(d.valor) : "—"}
                       </td>
+                      <td className="px-4 py-2.5 text-right max-md:text-left" data-label="Acciones">
+                        <BorrarButton tipo="deuda" pageId={d.notionPageId} nombre={d.concepto || "deuda"} />
+                      </td>
                     </tr>
                   ))}
                   {deudas.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
+                      <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
                         Sin deudas.
                       </td>
                     </tr>
