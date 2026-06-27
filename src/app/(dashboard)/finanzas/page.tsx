@@ -6,8 +6,12 @@ import { SyncButton } from "@/components/finanzas/sync-button";
 import { MovimientosTable } from "@/components/finanzas/movimientos-table";
 import { NuevoMovimiento } from "@/components/finanzas/nuevo-movimiento";
 import { NuevaDeuda } from "@/components/finanzas/nueva-deuda";
+import { NuevaCuenta } from "@/components/finanzas/nueva-cuenta";
+import { NuevaTarjeta } from "@/components/finanzas/nueva-tarjeta";
 import { BorrarButton } from "@/components/finanzas/borrar-button";
+import { listCuentas, listTarjetas } from "@/lib/services/cuentas";
 import { Card, CardLabel } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { AnimatedNumber } from "@/components/ui/count-up";
 import { Reveal } from "@/components/motion/reveal";
 
@@ -43,10 +47,12 @@ function Kpi({
 }
 
 export default async function FinanzasPage() {
-  const [movimientos, deudas, lastSync] = await Promise.all([
+  const [movimientos, deudas, lastSync, cuentas, tarjetas] = await Promise.all([
     listMovimientos(),
     listDeudas(),
     ultimoSync(),
+    listCuentas(),
+    listTarjetas(),
   ]);
   const r = resumen(movimientos);
   const porCat = gastosPorCategoria(movimientos);
@@ -214,6 +220,66 @@ export default async function FinanzasPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </section>
+      </Reveal>
+
+      {/* Cuentas y tarjetas */}
+      <Reveal id="fin-cuentas">
+        <section className="mt-10">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Cuentas y tarjetas</h2>
+            <div className="flex flex-wrap gap-2">
+              <NuevaCuenta />
+              <NuevaTarjeta cuentas={cuentas.map((c) => ({ id: c.id, nombre: c.nombre }))} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardLabel className="mb-3">Cuentas</CardLabel>
+              {cuentas.length > 0 ? (
+                <ul className="space-y-2">
+                  {cuentas.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-medium">{c.nombre}</span>
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <span className="capitalize">{c.tipo}</span>
+                        <span className="nums">{eur(c.saldoInicial)}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aún no tienes cuentas. Crea la primera.</p>
+              )}
+            </Card>
+
+            <Card>
+              <CardLabel className="mb-3">Tarjetas</CardLabel>
+              {tarjetas.length > 0 ? (
+                <ul className="space-y-2">
+                  {tarjetas.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-medium">{t.nombre}</span>
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <Badge tone={t.tipo === "credito" ? "brand" : "neutral"}>
+                          {t.tipo === "credito" ? "Crédito" : "Débito"}
+                        </Badge>
+                        {t.cuentaId && (
+                          <span>{cuentas.find((c) => c.id === t.cuentaId)?.nombre ?? "—"}</span>
+                        )}
+                        {t.tipo === "credito" && t.limite != null && (
+                          <span className="nums">límite {eur(t.limite)}</span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aún no tienes tarjetas. Crea la primera.</p>
+              )}
+            </Card>
           </div>
         </section>
       </Reveal>
