@@ -221,6 +221,35 @@ describe("ChatBubble", () => {
     expect(crearMovimiento).not.toHaveBeenCalled();
   });
 
+  it("al reescribir, envía el historial reciente con la propuesta anterior (memoria conversacional)", async () => {
+    enviar.mockResolvedValue({ ok: true, jobId: "jg" });
+    consultar
+      .mockResolvedValueOnce(PROPUESTA_GASTO)
+      .mockResolvedValue({ estado: "ok", tipo: "consulta_rag", respuesta: "Hecho.", fuentes: [] });
+
+    render(<ChatBubble defaultOpen pollMs={5} />);
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
+      target: { value: "apúntame un café" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /confirmar y crear/i })).toBeInTheDocument());
+
+    // El primer mensaje no lleva historial (conversación vacía).
+    expect(enviar).toHaveBeenNthCalledWith(1, { mensaje: "apúntame un café" });
+
+    // El usuario corrige sin confirmar la tarjeta.
+    fireEvent.change(screen.getByLabelText("Mensaje para el asistente"), {
+      target: { value: "no, fue hace 2 días" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => expect(enviar).toHaveBeenCalledTimes(2));
+    const segunda = enviar.mock.calls[1]![0] as { mensaje: string; historial?: { texto: string }[] };
+    expect(segunda.mensaje).toBe("no, fue hace 2 días");
+    expect(segunda.historial).toBeDefined();
+    expect(JSON.stringify(segunda.historial)).toContain("Propuse registrar un gasto");
+  });
+
   it("muestra el error si el job falla", async () => {
     enviar.mockResolvedValue({ ok: true, jobId: "j2" });
     consultar.mockResolvedValue({ estado: "error", error: "salida no válida" });

@@ -90,6 +90,28 @@ describe("construirPrompt", () => {
     expect(p).toMatch(/"gasto"\|"ingreso"/);
     expect(p).toContain("Leo"); // contexto recuperado
   });
+
+  it("asistente: incluye la conversación reciente y la regla de enmienda de propuestas", () => {
+    const j = job({
+      tipo: "asistente",
+      payload: {
+        mensaje: "no, fue hace 2 días",
+        historial: [
+          { rol: "user", texto: "apúntame un café de 2,5€" },
+          { rol: "assistant", texto: 'Propuse registrar un gasto: "Café", 2.5€, fecha 2026-06-27.' },
+        ],
+      },
+    });
+    const p = construirPrompt(j, [], "FECHA DE HOY: 2026-06-27");
+    expect(p).toContain("CONVERSACIÓN RECIENTE");
+    expect(p).toContain("Propuse registrar un gasto"); // el turno previo serializado
+    expect(p).toMatch(/corrige o ajusta una propuesta anterior/i); // la regla de enmienda
+  });
+
+  it("asistente sin historial: indica que no hay conversación previa", () => {
+    const j = job({ tipo: "asistente", payload: { mensaje: "hola" } });
+    expect(construirPrompt(j, [])).toContain("(sin conversación previa)");
+  });
 });
 
 describe("extraerJson", () => {
