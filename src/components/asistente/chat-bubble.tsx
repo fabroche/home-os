@@ -28,6 +28,7 @@ function esCardSinResolver(m: ChatMsg): boolean {
       m.propuestaGasto ||
         m.propuestaDeuda ||
         m.movimientoPagar ||
+        m.pagarCandidatos ||
         m.borrarObjetivo ||
         m.borrarCandidatos ||
         m.borrador ||
@@ -56,6 +57,12 @@ function turnoDeMensaje(m: ChatMsg): TurnoConversacion | null {
   if (m.movimientoPagar) {
     const p = m.movimientoPagar;
     return { rol: "assistant", texto: `Propuse marcar como pagado: "${p.nombre}" (${p.importe}€).` };
+  }
+  if (m.pagarCandidatos?.length) {
+    return {
+      rol: "assistant",
+      texto: `Ofrecí elegir cuál marcar como pagado: ${m.pagarCandidatos.map((c) => `"${c.nombre}"`).join(", ")}.`,
+    };
   }
   if (m.borrarObjetivo) {
     const o = m.borrarObjetivo;
@@ -241,10 +248,13 @@ export function ChatBubble({
             }
           } else if (st.tipo === "marcar_pagado") {
             const mov = st.movimiento;
+            const cands = st.candidatos ?? [];
             actualizar(aMsgId, {
               contenido: mov
                 ? "¿Confirmas marcarlo como pagado?"
-                : st.nota || "No tengo claro cuál. ¿Me dices el nombre del gasto?",
+                : cands.length
+                  ? "Encontré varios. ¿Cuál marco como pagado?"
+                  : st.nota || "No tengo claro cuál. ¿Me dices el nombre del gasto?",
               pendiente: false,
               jobId: undefined,
             });
@@ -252,6 +262,11 @@ export function ChatBubble({
               setMessages((ms) => [
                 ...ms,
                 { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", movimientoPagar: mov },
+              ]);
+            } else if (cands.length) {
+              setMessages((ms) => [
+                ...ms,
+                { id: crypto.randomUUID(), rol: "assistant" as const, contenido: "", pagarCandidatos: cands },
               ]);
             }
           } else if (st.tipo === "borrar") {

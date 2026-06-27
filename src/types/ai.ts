@@ -132,19 +132,23 @@ export const RegistrarDeudaOutputSchema = z.object({
 });
 export type RegistrarDeudaOutput = z.infer<typeof RegistrarDeudaOutputSchema>;
 
+/** Un movimiento elegible (id de Notion + nombre + importe) para marcar pagado. */
+export const MovimientoElegidoSchema = z.object({
+  id: z.string().trim().min(1),
+  nombre: z.string().trim().min(1),
+  importe: z.number(),
+});
+export type MovimientoElegido = z.infer<typeof MovimientoElegidoSchema>;
+
 /**
- * Marcar pagado: la IA elige, de entre los movimientos PENDIENTES que se le pasan,
- * cuál marcar como pagado (devuelve su id de página de Notion) o `movimiento: null`
- * con una `nota` si no lo tiene claro. El usuario confirma antes de ejecutar.
+ * Marcar pagado: la IA elige, de entre los movimientos PENDIENTES que se le pasan, cuál
+ * marcar como pagado (devuelve su id de página de Notion). Si SOLO uno encaja → `movimiento`;
+ * si VARIOS encajan → `candidatos` para que el usuario elija; si ninguno → null + `nota`.
+ * El usuario confirma antes de ejecutar.
  */
 export const MarcarPagadoOutputSchema = z.object({
-  movimiento: z
-    .object({
-      id: z.string().trim().min(1),
-      nombre: z.string().trim().min(1),
-      importe: z.number(),
-    })
-    .nullable(),
+  movimiento: MovimientoElegidoSchema.nullable(),
+  candidatos: z.array(MovimientoElegidoSchema).max(8).default([]),
   nota: z.string().trim().max(500).optional(),
 });
 export type MarcarPagadoOutput = z.infer<typeof MarcarPagadoOutputSchema>;
@@ -159,11 +163,6 @@ export type AccionAsistente = (typeof ACCIONES_ASISTENTE)[number];
 
 const NotaSchema = z.string().trim().max(500).optional();
 const FuenteSchema = z.object({ id: z.string(), titulo: z.string() });
-const MovimientoElegidoSchema = z.object({
-  id: z.string().trim().min(1),
-  nombre: z.string().trim().min(1),
-  importe: z.number(),
-});
 
 /** Objetivo de un borrado propuesto por la IA: un movimiento o una deuda, con su id de Notion. */
 export const ObjetivoBorrarSchema = z.object({
@@ -185,7 +184,13 @@ export const AsistenteOutputSchema = z.discriminatedUnion("accion", [
   z.object({ accion: z.literal("gasto"), propuesta: CrearMovimientoInputSchema.nullable(), nota: NotaSchema }),
   z.object({ accion: z.literal("ingreso"), propuesta: CrearMovimientoInputSchema.nullable(), nota: NotaSchema }),
   z.object({ accion: z.literal("deuda"), propuesta: CrearDeudaInputSchema.nullable(), nota: NotaSchema }),
-  z.object({ accion: z.literal("pagado"), movimiento: MovimientoElegidoSchema.nullable(), nota: NotaSchema }),
+  z.object({
+    accion: z.literal("pagado"),
+    movimiento: MovimientoElegidoSchema.nullable(),
+    // Varios pendientes encajan (ej. "marca pagado un gasto de comida") → lista para elegir.
+    candidatos: z.array(MovimientoElegidoSchema).max(8).default([]),
+    nota: NotaSchema,
+  }),
   z.object({
     accion: z.literal("borrar"),
     objetivo: ObjetivoBorrarSchema.nullable(),

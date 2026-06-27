@@ -43,6 +43,8 @@ export type ChatMsg = {
   propuestaDeuda?: CrearDeudaInput;
   /** Si está presente, el mensaje es un gasto pendiente a marcar como pagado. */
   movimientoPagar?: MovimientoAPagar;
+  /** Si está presente, hay VARIOS pendientes que encajan: el usuario elige cuál marcar. */
+  pagarCandidatos?: MovimientoAPagar[];
   /** Si está presente, el mensaje propone BORRAR un movimiento o deuda (se confirma en tarjeta). */
   borrarObjetivo?: ObjetivoBorrar;
   /** Si está presente, hay VARIOS candidatos a borrar: el usuario elige cuál antes de confirmar. */

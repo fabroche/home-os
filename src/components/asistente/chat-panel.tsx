@@ -107,10 +107,11 @@ export function ChatPanel({
                 resueltoInicial={m.accionResuelta}
                 onResuelto={(estado) => onResuelto?.(m.id, estado)}
               />
-            ) : m.movimientoPagar ? (
+            ) : m.movimientoPagar || m.pagarCandidatos ? (
               <MarcarPagadoCard
                 key={m.id}
                 movimiento={m.movimientoPagar}
+                candidatos={m.pagarCandidatos}
                 resueltoInicial={m.accionResuelta}
                 onResuelto={(estado) => onResuelto?.(m.id, estado)}
               />
