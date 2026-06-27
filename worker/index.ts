@@ -23,6 +23,16 @@ async function runSync() {
   }
 }
 
+async function runCuotas() {
+  try {
+    const { generarCuotasPendientes } = await import("@/lib/services/cuotas");
+    const creadas = await generarCuotasPendientes();
+    if (creadas > 0) console.warn(`[worker] cuotas · ${creadas} cuota(s) generada(s)`);
+  } catch (err) {
+    console.error("[worker] cuotas ERROR:", err instanceof Error ? err.message : err);
+  }
+}
+
 let draining = false;
 async function runDrain() {
   if (draining) return; // evita solapamiento entre ticks
@@ -59,7 +69,9 @@ async function main() {
     `[worker] iniciando · sync "${env.SYNC_CRON}" · drain ai_jobs cada ${env.AI_POLL_MS}ms`,
   );
   await runSync(); // corrida inicial al arrancar
+  await runCuotas(); // genera cuotas debidas al arrancar (catch-up si estuvo caído)
   cron.schedule(env.SYNC_CRON, runSync);
+  cron.schedule("5 0 * * *", runCuotas); // gastos a plazos: una vez al día (00:05)
   setInterval(runDrain, env.AI_POLL_MS); // drena la cola de IA con frecuencia (chat responsivo)
 }
 
