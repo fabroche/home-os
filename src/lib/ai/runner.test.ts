@@ -201,6 +201,25 @@ describe("ejecutarJob", () => {
     expect(res.movimiento?.id).toBe("pg1");
   });
 
+  it("marcar_pagado: ambiguo devuelve varios candidatos para elegir", async () => {
+    const j = job({ tipo: "marcar_pagado", payload: { peticion: "marca pagado un gasto de comida" } });
+    const invocar = async () =>
+      JSON.stringify({
+        movimiento: null,
+        candidatos: [
+          { id: "pg1", nombre: "Comida en el bar", importe: 12 },
+          { id: "pg2", nombre: "Comida con Ana", importe: 18 },
+        ],
+        nota: "",
+      });
+    const res = (await ejecutarJob(j, { invocar, recuperar, listar, finanzas, pendientes, borrables })) as {
+      movimiento: null;
+      candidatos: unknown[];
+    };
+    expect(res.movimiento).toBeNull();
+    expect(res.candidatos).toHaveLength(2);
+  });
+
   it("asistente: clasifica como gasto y devuelve la propuesta (con datos+pendientes en el prompt)", async () => {
     const j = job({ tipo: "asistente", payload: { mensaje: "gasté 40 en comida" } });
     let promptVisto = "";

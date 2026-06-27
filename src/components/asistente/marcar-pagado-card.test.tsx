@@ -35,4 +35,23 @@ describe("MarcarPagadoCard", () => {
     expect(screen.getByText(/^Cancelado/)).toBeInTheDocument();
     expect(cambiarEstadoMovimiento).not.toHaveBeenCalled();
   });
+
+  it("con varios candidatos pide elegir y luego confirma el elegido", async () => {
+    cambiarEstadoMovimiento.mockResolvedValue({ ok: true, id: "pg2" });
+    render(
+      <MarcarPagadoCard
+        candidatos={[
+          { id: "pg1", nombre: "Comida en el bar", importe: 12 },
+          { id: "pg2", nombre: "Comida con Ana", importe: 18 },
+        ]}
+      />,
+    );
+    expect(screen.getByText(/cuál marco como pagado/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /comida con ana/i }));
+    expect(screen.queryByText(/cuál marco como pagado/i)).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: /s[ií], marcar pagado/i }));
+    await waitFor(() => expect(cambiarEstadoMovimiento).toHaveBeenCalledWith("pg2", "Done"));
+  });
 });

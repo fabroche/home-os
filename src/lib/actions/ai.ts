@@ -143,7 +143,13 @@ export type JobEstado =
   | { estado: "ok"; tipo: "registrar_gasto"; propuesta: CrearMovimientoInput | null; nota?: string }
   | { estado: "ok"; tipo: "registrar_ingreso"; propuesta: CrearMovimientoInput | null; nota?: string }
   | { estado: "ok"; tipo: "registrar_deuda"; propuestaDeuda: CrearDeudaInput | null; nota?: string }
-  | { estado: "ok"; tipo: "marcar_pagado"; movimiento: MarcarPagadoOutput["movimiento"]; nota?: string }
+  | {
+      estado: "ok";
+      tipo: "marcar_pagado";
+      movimiento: MarcarPagadoOutput["movimiento"];
+      candidatos: MarcarPagadoOutput["candidatos"];
+      nota?: string;
+    }
   | { estado: "ok"; tipo: "borrar"; objetivo: ObjetivoBorrar | null; candidatos: ObjetivoBorrar[]; nota?: string }
   | { estado: "ok"; tipo: "aclarar"; pregunta: string; opciones: { etiqueta: string; accion: AccionAsistente }[] }
   | { estado: "error"; error: string };
@@ -174,7 +180,13 @@ export async function consultarJob(jobId: string): Promise<JobEstado> {
       if (job.tipo === "marcar_pagado") {
         const out = MarcarPagadoOutputSchema.safeParse(job.resultado);
         if (!out.success) return { estado: "error", error: "No pude identificar el gasto." };
-        return { estado: "ok", tipo: "marcar_pagado", movimiento: out.data.movimiento, nota: out.data.nota };
+        return {
+          estado: "ok",
+          tipo: "marcar_pagado",
+          movimiento: out.data.movimiento,
+          candidatos: out.data.candidatos,
+          nota: out.data.nota,
+        };
       }
       if (job.tipo === "asistente") {
         // El router devuelve una salida discriminada; la mapeamos a los MISMOS estados
@@ -192,7 +204,7 @@ export async function consultarJob(jobId: string): Promise<JobEstado> {
           case "deuda":
             return { estado: "ok", tipo: "registrar_deuda", propuestaDeuda: d.propuesta, nota: d.nota };
           case "pagado":
-            return { estado: "ok", tipo: "marcar_pagado", movimiento: d.movimiento, nota: d.nota };
+            return { estado: "ok", tipo: "marcar_pagado", movimiento: d.movimiento, candidatos: d.candidatos, nota: d.nota };
           case "borrar":
             return { estado: "ok", tipo: "borrar", objetivo: d.objetivo, candidatos: d.candidatos, nota: d.nota };
           case "contexto":
