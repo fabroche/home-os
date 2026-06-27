@@ -55,8 +55,20 @@ export const MarcarPagadoPayloadSchema = RegistrarGastoPayloadSchema;
  * natural y el modelo decide la intención en UNA pasada (responder/registrar/…/aclarar).
  * Sustituye a la heurística de intención del cliente: clasificar lo hace el modelo.
  */
+/** Un turno de la conversación reciente que se envía al router como contexto. */
+export const TurnoConversacionSchema = z.object({
+  rol: z.enum(["user", "assistant"]),
+  texto: z.string().trim().min(1).max(2000),
+});
+export type TurnoConversacion = z.infer<typeof TurnoConversacionSchema>;
+
 export const AsistentePayloadSchema = z.object({
   mensaje: z.string().trim().min(1, "El mensaje es obligatorio").max(2000),
+  /**
+   * Conversación reciente (más antiguo→más nuevo) para que el router entienda
+   * correcciones/ajustes a una propuesta anterior (ej. "no, fue hace 2 días").
+   */
+  historial: z.array(TurnoConversacionSchema).max(12).optional(),
 });
 export type AsistentePayload = z.infer<typeof AsistentePayloadSchema>;
 

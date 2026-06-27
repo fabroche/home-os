@@ -32,6 +32,13 @@ function textoEntrada(job: AiJob): string {
   return String(p.peticion ?? ""); // resto de tareas usan `peticion`
 }
 
+/** Formatea la conversación reciente (`payload.historial`) para el prompt del router. */
+function historialTexto(job: AiJob): string {
+  const h = (job.payload as { historial?: { rol: string; texto: string }[] } | null)?.historial;
+  if (!h?.length) return "(sin conversación previa)";
+  return h.map((t) => `${t.rol === "user" ? "Usuario" : "Asistente"}: ${t.texto}`).join("\n");
+}
+
 /** Construye el prompt (puro y testeable). `datos` = snapshot financiero (consulta_rag). */
 export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], datos?: string): string {
   const contexto = fragmentos.length
@@ -68,6 +75,10 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       "- En \"pagado\" elige de GASTOS PENDIENTES y devuelve su id EXACTO; si ninguno encaja, movimiento:null.",
       '- Una PREGUNTA nunca es una acción de registro: "¿en qué gasto más?" es "responder", no "gasto".',
       "- Si falta info para registrar (p.ej. el importe), usa esa acción con propuesta:null y dilo en `nota`.",
+      "- Si el MENSAJE corrige o ajusta una propuesta anterior de la CONVERSACIÓN RECIENTE (cambia",
+      "  importe, fecha, persona, concepto…), vuelve a proponer la MISMA acción con los datos YA",
+      '  corregidos (ej.: "no, fue hace 2 días" → la misma propuesta con la fecha recalculada). No',
+      "  empieces de cero ni vuelvas a pedir lo que ya se dijo.",
       "",
       "Devuelve EXCLUSIVAMENTE un JSON válido, sin markdown, con UNA de estas formas:",
       '{ "accion": "responder", "respuesta": string, "fuentes": [ { "id": string, "titulo": string } ] }',
@@ -83,6 +94,9 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       "",
       "=== CONTEXTO (banco de conocimiento, publicado) ===",
       contexto,
+      "",
+      "=== CONVERSACIÓN RECIENTE (más antiguo→más nuevo) ===",
+      historialTexto(job),
       "",
       "=== MENSAJE ===",
       entrada,

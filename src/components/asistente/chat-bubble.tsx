@@ -16,7 +16,7 @@ import {
 } from "@/lib/actions/ai";
 import { ChatPanel } from "@/components/asistente/chat-panel";
 import type { ChatMsg, AccionResuelta } from "@/components/asistente/chat-message";
-import type { AccionAsistente } from "@/types/ai";
+import type { AccionAsistente, TurnoConversacion } from "@/types/ai";
 
 const STORAGE_KEY = "homeos.chat.v1";
 
@@ -26,6 +26,40 @@ function esCardSinResolver(m: ChatMsg): boolean {
     !m.accionResuelta &&
     Boolean(m.propuestaGasto || m.propuestaDeuda || m.movimientoPagar || m.borrador || m.aclarar)
   );
+}
+
+/**
+ * Convierte un mensaje del chat en un turno de conversación para el router. Las tarjetas
+ * (cuyo `contenido` está vacío) se serializan a texto para que el modelo entienda qué
+ * propuso antes y pueda enmendarla. Devuelve null para lo que no aporta contexto.
+ */
+function turnoDeMensaje(m: ChatMsg): TurnoConversacion | null {
+  if (m.pendiente) return null;
+  if (m.rol === "user") return m.contenido ? { rol: "user", texto: m.contenido } : null;
+  if (m.propuestaGasto) {
+    const p = m.propuestaGasto;
+    const tipo = p.tipo.startsWith("Ingreso") ? "ingreso" : "gasto";
+    return { rol: "assistant", texto: `Propuse registrar un ${tipo}: "${p.nombre}", ${p.importe}€, categoría ${p.categoria}, ${p.tipo}, fecha ${p.fecha}.` };
+  }
+  if (m.propuestaDeuda) {
+    const p = m.propuestaDeuda;
+    return { rol: "assistant", texto: `Propuse registrar ${p.movimiento === "pago" ? "un pago" : "una deuda"}: "${p.concepto}", persona ${p.persona}, ${p.valor}€, fecha ${p.fecha}.` };
+  }
+  if (m.movimientoPagar) {
+    const p = m.movimientoPagar;
+    return { rol: "assistant", texto: `Propuse marcar como pagado: "${p.nombre}" (${p.importe}€).` };
+  }
+  if (m.borrador) return { rol: "assistant", texto: `Propuse guardar en el banco de contexto: "${m.borrador.titulo}".` };
+  if (m.aclarar) return { rol: "assistant", texto: `Pedí aclaración: ${m.aclarar.pregunta}` };
+  return m.contenido ? { rol: "assistant", texto: m.contenido } : null;
+}
+
+/** Últimos turnos de la conversación (compacto) que se envían al router como contexto. */
+function construirHistorial(messages: ChatMsg[]): TurnoConversacion[] {
+  return messages
+    .map(turnoDeMensaje)
+    .filter((t): t is TurnoConversacion => t !== null)
+    .slice(-8);
 }
 
 /**
@@ -295,12 +329,18 @@ export function ChatBubble({
   // confirmar por error (evita duplicados y cards "zombi" al reabrir).
   const onSend = useCallback(
     (texto: string) => {
+      // Historial ANTES de añadir este mensaje: da al router el contexto para enmendar
+      // una propuesta anterior (ej. "no, fue hace 2 días"). Se omite si no hay nada.
+      const historial = construirHistorial(messages);
       setMessages((ms) =>
         ms.map((m) => (esCardSinResolver(m) ? { ...m, accionResuelta: "superado" as const } : m)),
       );
-      void lanzarJob(() => enviarAlAsistente({ mensaje: texto }), { userMsg: texto, mensajeOrigen: texto });
+      void lanzarJob(
+        () => enviarAlAsistente({ mensaje: texto, ...(historial.length ? { historial } : {}) }),
+        { userMsg: texto, mensajeOrigen: texto },
+      );
     },
-    [lanzarJob],
+    [lanzarJob, messages],
   );
 
   // Elegir una opción de desambiguación: reenvía el mensaje original FORZANDO la acción.
