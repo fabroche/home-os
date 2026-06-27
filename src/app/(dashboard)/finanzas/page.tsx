@@ -1,5 +1,12 @@
 import { listMovimientos, listDeudas, resumen, ultimoSync } from "@/lib/services/finanzas";
-import { gastosPorCategoria, porMes, resumenDeudas } from "@/lib/finanzas/aggregations";
+import {
+  gastosPorCategoria,
+  porMes,
+  resumenDeudas,
+  balancePorCuenta,
+  aPagarPorTarjeta,
+  gastoPorPersona,
+} from "@/lib/finanzas/aggregations";
 import { PERSONAS_DEUDA } from "@/types/finanzas";
 import { BarList } from "@/components/finanzas/bar-list";
 import { SyncButton } from "@/components/finanzas/sync-button";
@@ -58,6 +65,10 @@ export default async function FinanzasPage() {
   const porCat = gastosPorCategoria(movimientos);
   const meses = porMes(movimientos);
   const rd = resumenDeudas(deudas);
+  // Resúmenes del modelo nativo: balance por cuenta, a-pagar de crédito y gasto por persona.
+  const saldoCuentas = new Map(balancePorCuenta(movimientos, cuentas).map((x) => [x.cuenta.id, x.balance]));
+  const aPagar = new Map(aPagarPorTarjeta(movimientos, tarjetas).map((x) => [x.tarjeta.id, x.total]));
+  const gastoPersona = gastoPorPersona(movimientos);
   // Personas existentes (de los datos reales) unidas con las conocidas, para el alta de deuda.
   const personasDeuda = [
     ...new Set([
@@ -237,16 +248,15 @@ export default async function FinanzasPage() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <CardLabel className="mb-3">Cuentas</CardLabel>
+              <CardLabel className="mb-3">Cuentas · balance</CardLabel>
               {cuentas.length > 0 ? (
                 <ul className="space-y-2">
                   {cuentas.map((c) => (
                     <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="font-medium">{c.nombre}</span>
-                      <span className="flex items-center gap-2 text-muted-foreground">
-                        <span className="capitalize">{c.tipo}</span>
-                        <span className="nums">{eur(c.saldoInicial)}</span>
+                      <span className="font-medium">
+                        {c.nombre} <span className="font-normal capitalize text-muted-foreground">· {c.tipo}</span>
                       </span>
+                      <span className="nums font-medium">{eur(saldoCuentas.get(c.id) ?? c.saldoInicial)}</span>
                     </li>
                   ))}
                 </ul>
@@ -258,29 +268,46 @@ export default async function FinanzasPage() {
             <Card>
               <CardLabel className="mb-3">Tarjetas</CardLabel>
               {tarjetas.length > 0 ? (
-                <ul className="space-y-2">
-                  {tarjetas.map((t) => (
-                    <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="font-medium">{t.nombre}</span>
-                      <span className="flex items-center gap-2 text-muted-foreground">
-                        <Badge tone={t.tipo === "credito" ? "brand" : "neutral"}>
-                          {t.tipo === "credito" ? "Crédito" : "Débito"}
-                        </Badge>
-                        {t.cuentaId && (
-                          <span>{cuentas.find((c) => c.id === t.cuentaId)?.nombre ?? "—"}</span>
+                <ul className="space-y-3">
+                  {tarjetas.map((t) => {
+                    const esCredito = t.tipo === "credito";
+                    const desglose = esCredito ? gastoPorPersona(movimientos, t.id) : [];
+                    return (
+                      <li key={t.id} className="text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-2 font-medium">
+                            {t.nombre}
+                            <Badge tone={esCredito ? "brand" : "neutral"}>
+                              {esCredito ? "Crédito" : "Débito"}
+                            </Badge>
+                          </span>
+                          {esCredito && (
+                            <span className="nums font-medium text-debt">
+                              a pagar {eur(aPagar.get(t.id) ?? 0)}
+                            </span>
+                          )}
+                        </div>
+                        {desglose.length > 0 && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {desglose.map((d) => `${d.persona}: ${eur(d.total)}`).join(" · ")}
+                          </p>
                         )}
-                        {t.tipo === "credito" && t.limite != null && (
-                          <span className="nums">límite {eur(t.limite)}</span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className="text-sm text-muted-foreground">Aún no tienes tarjetas. Crea la primera.</p>
               )}
             </Card>
           </div>
+
+          {gastoPersona.length > 0 && (
+            <Card className="mt-4">
+              <CardLabel className="mb-3">Gasto por persona</CardLabel>
+              <BarList items={gastoPersona.map((g) => ({ label: g.persona, value: g.total }))} format={eur} />
+            </Card>
+          )}
         </section>
       </Reveal>
 

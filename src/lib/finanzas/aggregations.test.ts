@@ -1,6 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { resumen, gastosPorCategoria, ingresosPorCategoria, porMes, resumenDeudas } from "./aggregations";
+import {
+  resumen,
+  gastosPorCategoria,
+  ingresosPorCategoria,
+  porMes,
+  resumenDeudas,
+  balancePorCuenta,
+  aPagarPorTarjeta,
+  gastoPorPersona,
+} from "./aggregations";
 import type { Movimiento, Deuda } from "@/types/finanzas";
+import type { Cuenta, Tarjeta } from "@/types/cuentas";
 
 function mov(flujo: Movimiento["flujo"], importe: number | null): Movimiento {
   return {
@@ -134,5 +144,72 @@ describe("resumenDeudas", () => {
     expect(r.totalPorCobrar).toBe(0);
     expect(r.porPersona).toHaveLength(0);
     expect(r.porCobrar).toHaveLength(0);
+  });
+});
+
+const cuenta = (id: string, saldoInicial: number): Cuenta => ({
+  id,
+  nombre: id,
+  tipo: "corriente",
+  saldoInicial,
+  activo: true,
+});
+const tarjeta = (id: string, tipo: Tarjeta["tipo"]): Tarjeta => ({
+  id,
+  cuentaId: null,
+  nombre: id,
+  tipo,
+  limite: null,
+  diaCorte: null,
+  diaPago: null,
+  activo: true,
+});
+
+describe("balancePorCuenta", () => {
+  it("suma saldo inicial + movimientos firmados de esa cuenta", () => {
+    const movs: Movimiento[] = [
+      { ...mov("gasto", -50), cuentaId: "c1" },
+      { ...mov("ingreso", 200), cuentaId: "c1" },
+      { ...mov("gasto", -30), cuentaId: "c2" },
+      { ...mov("gasto", -999), cuentaId: null }, // sin cuenta → no cuenta para ninguna
+    ];
+    const r = balancePorCuenta(movs, [cuenta("c1", 100), cuenta("c2", 0)]);
+    expect(r.find((x) => x.cuenta.id === "c1")!.balance).toBe(250); // 100 - 50 + 200
+    expect(r.find((x) => x.cuenta.id === "c2")!.balance).toBe(-30);
+  });
+});
+
+describe("aPagarPorTarjeta", () => {
+  it("suma cargos PENDIENTES de tarjetas de crédito (ignora débito y pagados)", () => {
+    const movs: Movimiento[] = [
+      { ...mov("gasto", -100), tarjetaId: "tc", estado: "Pending" },
+      { ...mov("gasto", -40), tarjetaId: "tc", estado: "Done" }, // pagado → no cuenta
+      { ...mov("gasto", -25), tarjetaId: "td", estado: "Pending" }, // débito → no aparece
+    ];
+    const r = aPagarPorTarjeta(movs, [tarjeta("tc", "credito"), tarjeta("td", "debito")]);
+    expect(r).toHaveLength(1);
+    expect(r[0]!.tarjeta.id).toBe("tc");
+    expect(r[0]!.total).toBe(100);
+  });
+});
+
+describe("gastoPorPersona", () => {
+  it("agrupa gasto por persona; filtra por tarjeta si se indica", () => {
+    const movs: Movimiento[] = [
+      { ...mov("gasto", -300), persona: "Yo", tarjetaId: "tc" },
+      { ...mov("gasto", -500), persona: "Pareja", tarjetaId: "tc" },
+      { ...mov("gasto", -50), persona: "Yo", tarjetaId: "otra" },
+      { ...mov("ingreso", 1000), persona: "Yo" }, // ingreso no cuenta
+      { ...mov("gasto", -10), persona: null }, // sin persona → ignora
+    ];
+    const global = gastoPorPersona(movs);
+    expect(global[0]).toEqual({ persona: "Pareja", total: 500 });
+    expect(global.find((x) => x.persona === "Yo")!.total).toBe(350);
+
+    const enTarjeta = gastoPorPersona(movs, "tc");
+    expect(enTarjeta).toEqual([
+      { persona: "Pareja", total: 500 },
+      { persona: "Yo", total: 300 },
+    ]);
   });
 });
