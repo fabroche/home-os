@@ -61,6 +61,24 @@ describe("escritura nativa de finanzas (Fase B)", () => {
     });
   });
 
+  it("crearMovimientoNativo: persiste etiquetas cuenta/tarjeta/persona", async () => {
+    await crearMovimientoNativo(
+      {
+        nombre: "Sushi",
+        importe: 21,
+        categoria: "Restaurantes",
+        tipo: "Gasto Variable",
+        fecha: "2026-06-27",
+        estado: "Pending",
+        cuentaId: "c1",
+        tarjetaId: "t1",
+        persona: "Ana",
+      },
+      "u",
+    );
+    expect(inserts[0]!.row).toMatchObject({ cuenta_id: "c1", tarjeta_id: "t1", persona: "Ana" });
+  });
+
   it("crearMovimientoNativo: ingreso → importe positivo, flujo ingreso", async () => {
     await crearMovimientoNativo(
       { nombre: "Sueldo", importe: 1500, categoria: "Salario", tipo: "Ingreso Fijo", fecha: "2026-06-27", estado: "Pending" },

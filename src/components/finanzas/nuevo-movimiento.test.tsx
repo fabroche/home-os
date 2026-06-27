@@ -37,6 +37,30 @@ describe("NuevoMovimiento", () => {
     );
   });
 
+  it("etiqueta el movimiento con cuenta, tarjeta y persona", async () => {
+    crearMovimiento.mockResolvedValue({ ok: true, id: "m2" });
+    render(
+      <NuevoMovimiento
+        cuentas={[{ id: "c1", nombre: "Santander" }]}
+        tarjetas={[{ id: "t1", nombre: "Visa" }]}
+        personas={["Ana"]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /nuevo movimiento/i }));
+    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Sushi" } });
+    fireEvent.change(screen.getByLabelText("Importe (€)"), { target: { value: "21" } });
+    fireEvent.change(screen.getByLabelText("Cuenta"), { target: { value: "c1" } });
+    fireEvent.change(screen.getByLabelText("Tarjeta"), { target: { value: "t1" } });
+    fireEvent.change(screen.getByLabelText("Persona"), { target: { value: "Ana" } });
+    fireEvent.click(screen.getByRole("button", { name: "Crear" }));
+
+    await waitFor(() => expect(crearMovimiento).toHaveBeenCalled());
+    expect(crearMovimiento).toHaveBeenCalledWith(
+      expect.objectContaining({ nombre: "Sushi", cuentaId: "c1", tarjetaId: "t1", persona: "Ana" }),
+    );
+  });
+
   it("muestra errores de campo y no cierra", async () => {
     crearMovimiento.mockResolvedValue({
       ok: false,

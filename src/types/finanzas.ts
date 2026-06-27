@@ -34,6 +34,10 @@ export const MovimientoSchema = z.object({
   categoria: z.string().nullable(),
   tipo: z.string().nullable(),
   estado: z.string().nullable(),
+  // Etiquetado (Fase B+): a qué cuenta/tarjeta pertenece y de quién fue el cargo (persona).
+  cuentaId: z.string().nullable().optional(),
+  tarjetaId: z.string().nullable().optional(),
+  persona: z.string().nullable().optional(),
   facturas: z.array(z.string()), // URLs de la factura (Notion `invoices`)
   comprobantes: z.array(z.string()).default([]), // URLs del comprobante de pago (Notion `comprobante`)
   flujo: z.enum(["ingreso", "gasto", "deuda"]),
@@ -77,6 +81,10 @@ export const CrearMovimientoInputSchema = z.object({
   tipo: z.enum(TIPOS),
   fecha: isoDate,
   estado: z.enum(ESTADOS).default("Pending"),
+  // Etiquetado opcional (nativo): cuenta/tarjeta a la que va y persona a la que se atribuye.
+  cuentaId: z.string().nullable().optional(),
+  tarjetaId: z.string().nullable().optional(),
+  persona: z.string().trim().max(80).nullable().optional(),
 });
 export type CrearMovimientoInput = z.infer<typeof CrearMovimientoInputSchema>;
 

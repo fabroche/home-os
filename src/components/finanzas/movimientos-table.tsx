@@ -142,7 +142,10 @@ export function MovimientosTable({ movimientos }: { movimientos: Movimiento[] })
             {mostradas.map((m) => (
               <tr key={m.id} className="border-t border-border transition-colors hover:bg-accent/50">
                 <td className="px-4 py-2.5 nums text-muted-foreground" data-label="Fecha">{m.fecha ?? "—"}</td>
-                <td className="px-4 py-2.5 max-md:font-medium" data-label="Nombre">{m.nombre || "—"}</td>
+                <td className="px-4 py-2.5 max-md:font-medium" data-label="Nombre">
+                  {m.nombre || "—"}
+                  {m.persona && <span className="ml-1.5 text-xs font-normal text-muted-foreground">· {m.persona}</span>}
+                </td>
                 <td className="px-4 py-2.5 text-muted-foreground" data-label="Categoría">{m.categoria ?? "—"}</td>
                 <td className="px-4 py-2.5" data-label="Estado">
                   <EstadoToggle pageId={m.id} estado={m.estado} />

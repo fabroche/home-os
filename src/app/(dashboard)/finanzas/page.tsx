@@ -288,7 +288,11 @@ export default async function FinanzasPage() {
       <Reveal id="fin-movimientos">
         <h2 className="mt-10 mb-3 text-lg font-semibold">Movimientos</h2>
         <div className="mb-4">
-          <NuevoMovimiento />
+          <NuevoMovimiento
+            cuentas={cuentas.map((c) => ({ id: c.id, nombre: c.nombre }))}
+            tarjetas={tarjetas.map((t) => ({ id: t.id, nombre: t.nombre }))}
+            personas={personasDeuda}
+          />
         </div>
         <MovimientosTable movimientos={movimientos} />
       </Reveal>
