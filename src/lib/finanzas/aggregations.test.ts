@@ -4,6 +4,7 @@ import type { Movimiento, Deuda } from "@/types/finanzas";
 
 function mov(flujo: Movimiento["flujo"], importe: number | null): Movimiento {
   return {
+    id: Math.random().toString(36),
     notionPageId: Math.random().toString(36),
     nombre: "x",
     fecha: "2026-06-01",
@@ -91,6 +92,7 @@ describe("porMes", () => {
 
 function deuda(valor: number | null, persona: string | null): Deuda {
   return {
+    id: Math.random().toString(36),
     notionPageId: Math.random().toString(36),
     concepto: "x",
     fechaCreacion: "2026-06-01",

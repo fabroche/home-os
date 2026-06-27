@@ -14,6 +14,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 import { MovimientosTable } from "@/components/finanzas/movimientos-table";
 
 const mov = (over: Partial<Movimiento>): Movimiento => ({
+  id: crypto.randomUUID(),
   notionPageId: crypto.randomUUID(),
   nombre: "Mov",
   fecha: "2026-06-01",

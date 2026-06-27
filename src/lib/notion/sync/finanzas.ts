@@ -1,11 +1,10 @@
 import "@/lib/server-guard";
 import { queryDatabase } from "@/lib/notion/databases";
-import { retrievePage } from "@/lib/notion/mutations";
 import { PRESUPUESTO, DEUDAS } from "@/lib/notion/schema";
 import { toMovimiento } from "@/lib/notion/mappers/presupuesto";
 import { toDeuda } from "@/lib/notion/mappers/deuda";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import type { Movimiento, Deuda } from "@/types/finanzas";
+import type { MovimientoImport, DeudaImport } from "@/types/finanzas";
 
 /**
  * Sync Notion → Supabase (modelo híbrido). Lee las DBs de Notion (paginado +
@@ -18,7 +17,7 @@ import type { Movimiento, Deuda } from "@/types/finanzas";
  * solo activos (deleted_at is null). El incremental por `sync_state.last_edited`
  * es mejora futura. Lo invoca el worker (cron) y el script `sync:finanzas`.
  */
-const movimientoRow = (m: Movimiento, now: string) => ({
+const movimientoRow = (m: MovimientoImport, now: string) => ({
   notion_page_id: m.notionPageId,
   nombre: m.nombre,
   fecha: m.fecha,
@@ -35,7 +34,7 @@ const movimientoRow = (m: Movimiento, now: string) => ({
   deleted_at: null,
 });
 
-const deudaRow = (d: Deuda, now: string) => ({
+const deudaRow = (d: DeudaImport, now: string) => ({
   notion_page_id: d.notionPageId,
   concepto: d.concepto,
   fecha_creacion: d.fechaCreacion,
@@ -46,26 +45,6 @@ const deudaRow = (d: Deuda, now: string) => ({
   synced_at: now,
   deleted_at: null,
 });
-
-/** Re-sincroniza una sola página de Presupuesto tras escribir en Notion. */
-export async function syncMovimientoById(pageId: string): Promise<void> {
-  const sb = createSupabaseServiceClient();
-  const m = toMovimiento(await retrievePage(pageId));
-  const { error } = await sb
-    .from("movimiento")
-    .upsert([movimientoRow(m, new Date().toISOString())], { onConflict: "notion_page_id" });
-  if (error) throw new Error(`syncMovimientoById: ${error.message}`);
-}
-
-/** Re-sincroniza una sola página de Deudas_Personales tras escribir en Notion. */
-export async function syncDeudaById(pageId: string): Promise<void> {
-  const sb = createSupabaseServiceClient();
-  const d = toDeuda(await retrievePage(pageId));
-  const { error } = await sb
-    .from("deuda")
-    .upsert([deudaRow(d, new Date().toISOString())], { onConflict: "notion_page_id" });
-  if (error) throw new Error(`syncDeudaById: ${error.message}`);
-}
 
 /**
  * Marca como borradas (soft-delete) las filas que no se tocaron en esta corrida,

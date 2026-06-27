@@ -1,13 +1,13 @@
 import type { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 import { PRESUPUESTO } from "../schema";
 import { readDate, readFiles, readNumber, readSelect, readStatus, readTitle } from "../properties";
-import { MovimientoSchema, flujoDeTipo, type Movimiento } from "@/types/finanzas";
+import { MovimientoImportSchema, flujoDeTipo, type MovimientoImport } from "@/types/finanzas";
 
-/** Página de Notion (DB Presupuesto) → DTO de dominio `Movimiento`, validado con Zod. */
-export function toMovimiento(page: PageObjectResponse): Movimiento {
+/** Página de Notion (DB Presupuesto) → forma de importación (sin `id`), validada con Zod. */
+export function toMovimiento(page: PageObjectResponse): MovimientoImport {
   const p = page.properties;
   const tipo = readSelect(p[PRESUPUESTO.props.tipo]);
-  return MovimientoSchema.parse({
+  return MovimientoImportSchema.parse({
     notionPageId: page.id,
     nombre: readTitle(p[PRESUPUESTO.props.nombre]),
     fecha: readDate(p[PRESUPUESTO.props.fecha]),

@@ -188,7 +188,7 @@ export default async function FinanzasPage() {
                 </thead>
                 <tbody>
                   {deudas.map((d) => (
-                    <tr key={d.notionPageId} className="border-t border-border transition-colors hover:bg-accent/50">
+                    <tr key={d.id} className="border-t border-border transition-colors hover:bg-accent/50">
                       <td className="px-4 py-2.5" data-label="Concepto">{d.concepto || "—"}</td>
                       <td className="px-4 py-2.5" data-label="Persona">{d.persona ?? "—"}</td>
                       <td
@@ -200,7 +200,7 @@ export default async function FinanzasPage() {
                         {d.valor != null ? eur(d.valor) : "—"}
                       </td>
                       <td className="px-4 py-2.5 text-right max-md:text-left" data-label="Acciones">
-                        <BorrarButton tipo="deuda" pageId={d.notionPageId} nombre={d.concepto || "deuda"} />
+                        <BorrarButton tipo="deuda" pageId={d.id} nombre={d.concepto || "deuda"} />
                       </td>
                     </tr>
                   ))}
