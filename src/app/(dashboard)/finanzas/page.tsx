@@ -62,7 +62,7 @@ export default async function FinanzasPage() {
   return (
     <main className="container-app max-w-5xl py-8 sm:py-12">
       {/* Encabezado */}
-      <Reveal>
+      <Reveal id="fin-header">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl sm:text-4xl">
@@ -77,7 +77,7 @@ export default async function FinanzasPage() {
       </Reveal>
 
       {/* KPIs */}
-      <Reveal delay={0.05}>
+      <Reveal id="fin-kpis" delay={0.05}>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Kpi label="Ingresos" value={r.ingresos} accent="text-income" />
           <Kpi label="Gastos" value={r.gastos} accent="text-expense" />
@@ -88,7 +88,7 @@ export default async function FinanzasPage() {
 
       {/* Categorías + Mensual */}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <Reveal>
+        <Reveal id="fin-categorias">
           <section>
             <h2 className="mb-3 text-lg font-semibold">Gastos por categoría</h2>
             <Card>
@@ -97,7 +97,7 @@ export default async function FinanzasPage() {
           </section>
         </Reveal>
 
-        <Reveal delay={0.05}>
+        <Reveal id="fin-mensual" delay={0.05}>
           <section>
             <h2 className="mb-3 text-lg font-semibold">Resumen mensual</h2>
             <div className="overflow-x-auto rounded-xl border border-border max-md:border-0">
@@ -127,7 +127,7 @@ export default async function FinanzasPage() {
       </div>
 
       {/* Deudas */}
-      <Reveal>
+      <Reveal id="fin-deudas">
         <section className="mt-10">
           <h2 className="mb-3 text-lg font-semibold">Deudas personales</h2>
           <div className="mb-4">
@@ -212,7 +212,7 @@ export default async function FinanzasPage() {
       </Reveal>
 
       {/* Movimientos */}
-      <Reveal>
+      <Reveal id="fin-movimientos">
         <h2 className="mt-10 mb-3 text-lg font-semibold">Movimientos</h2>
         <div className="mb-4">
           <NuevoMovimiento />

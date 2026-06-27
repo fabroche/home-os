@@ -17,7 +17,7 @@ export function ModuleStub({
   return (
     <main className="relative container-app max-w-5xl overflow-hidden py-16">
       <div className="glow-bg" aria-hidden />
-      <Reveal>
+      <Reveal id={`stub-${modulo}`}>
         <Badge tone="brand">{modulo} · próximamente</Badge>
         <h1 className="mt-4 text-4xl sm:text-5xl">
           {titulo} <span className="serif-accent text-primary">{accent}</span>
