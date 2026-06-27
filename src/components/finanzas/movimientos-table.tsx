@@ -140,21 +140,21 @@ export function MovimientosTable({ movimientos }: { movimientos: Movimiento[] })
           </thead>
           <tbody>
             {mostradas.map((m) => (
-              <tr key={m.notionPageId} className="border-t border-border transition-colors hover:bg-accent/50">
+              <tr key={m.id} className="border-t border-border transition-colors hover:bg-accent/50">
                 <td className="px-4 py-2.5 nums text-muted-foreground" data-label="Fecha">{m.fecha ?? "—"}</td>
                 <td className="px-4 py-2.5 max-md:font-medium" data-label="Nombre">{m.nombre || "—"}</td>
                 <td className="px-4 py-2.5 text-muted-foreground" data-label="Categoría">{m.categoria ?? "—"}</td>
                 <td className="px-4 py-2.5" data-label="Estado">
-                  <EstadoToggle pageId={m.notionPageId} estado={m.estado} />
+                  <EstadoToggle pageId={m.id} estado={m.estado} />
                 </td>
                 <td className="px-4 py-2.5" data-label="Archivos">
-                  <ArchivosCell pageId={m.notionPageId} facturas={m.facturas} comprobantes={m.comprobantes} />
+                  <ArchivosCell pageId={m.id} facturas={m.facturas} comprobantes={m.comprobantes} />
                 </td>
                 <td className={`px-4 py-2.5 text-right nums font-medium ${COLOR_FLUJO[m.flujo] ?? ""}`} data-label="Importe">
                   {m.importe != null ? eur(m.importe) : "—"}
                 </td>
                 <td className="px-4 py-2.5 text-right max-md:text-left" data-label="Acciones">
-                  <BorrarButton tipo="movimiento" pageId={m.notionPageId} nombre={m.nombre || "movimiento"} />
+                  <BorrarButton tipo="movimiento" pageId={m.id} nombre={m.nombre || "movimiento"} />
                 </td>
               </tr>
             ))}

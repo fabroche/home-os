@@ -292,7 +292,7 @@ async function snapshotFinanzas(): Promise<string> {
   return lineas.join("\n");
 }
 
-/** Lista de gastos PENDIENTES (con su id de Notion) para que la IA elija al marcar pagado. */
+/** Lista de gastos PENDIENTES (con su `id` nativo) para que la IA elija al marcar pagado. */
 async function movimientosPendientes(): Promise<string> {
   const movs = await listMovimientos();
   const pend = movs
@@ -302,20 +302,20 @@ async function movimientosPendientes(): Promise<string> {
   return pend
     .map(
       (m) =>
-        `id:${m.notionPageId} | ${m.nombre} | ${Math.abs(m.importe ?? 0).toFixed(2)} € | ${m.fecha ?? "sin fecha"}`,
+        `id:${m.id} | ${m.nombre} | ${Math.abs(m.importe ?? 0).toFixed(2)} € | ${m.fecha ?? "sin fecha"}`,
     )
     .join("\n");
 }
 
-/** Lista de movimientos y deudas (con su id de Notion) que la IA puede proponer BORRAR. */
+/** Lista de movimientos y deudas (con su `id` nativo) que la IA puede proponer BORRAR. */
 async function borrables(): Promise<string> {
   const [movs, deudas] = await Promise.all([listMovimientos(), listDeudas()]);
   const m = movs
     .slice(0, 40)
-    .map((x) => `id:${x.notionPageId} | ${x.nombre} | ${Math.abs(x.importe ?? 0).toFixed(2)} € | ${x.fecha ?? "sin fecha"} | ${x.estado ?? ""}`);
+    .map((x) => `id:${x.id} | ${x.nombre} | ${Math.abs(x.importe ?? 0).toFixed(2)} € | ${x.fecha ?? "sin fecha"} | ${x.estado ?? ""}`);
   const d = deudas
     .slice(0, 40)
-    .map((x) => `id:${x.notionPageId} | ${x.concepto} | ${x.persona ?? "—"} | ${(x.valor ?? 0).toFixed(2)} €`);
+    .map((x) => `id:${x.id} | ${x.concepto} | ${x.persona ?? "—"} | ${(x.valor ?? 0).toFixed(2)} €`);
   return [
     "MOVIMIENTOS:",
     m.length ? m.join("\n") : "(ninguno)",

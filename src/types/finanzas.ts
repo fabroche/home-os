@@ -22,12 +22,12 @@ export type Categoria = (typeof CATEGORIAS)[number];
 export type Flujo = "ingreso" | "gasto" | "deuda";
 
 export const MovimientoSchema = z.object({
-  // Identidad nativa (Fase B): `id` es la identidad real en Supabase. Al mapear DESDE Notion
-  // aún no hay `id` (lo pone la BD); en B1 todas las filas son de Notion, así que `notionPageId`
-  // sigue presente (en B2 pasará a opcional cuando existan filas nativas de la app).
-  id: z.string().optional(),
-  origen: z.string().optional(), // notion | app | email | manual
-  notionPageId: z.string(),
+  // Identidad nativa (Fase B): `id` (uuid de Supabase) es la identidad real. `notionPageId`
+  // es un enlace OPCIONAL: solo lo llevan las filas importadas de Notion (las nativas de la
+  // app lo tienen null). `origen` indica quién manda la fila (notion | app | email | manual).
+  id: z.string(),
+  origen: z.string().optional(),
+  notionPageId: z.string().nullable().optional(),
   nombre: z.string(),
   fecha: z.string().nullable(), // ISO date (YYYY-MM-DD)
   importe: z.number().nullable(), // euros
@@ -41,6 +41,15 @@ export const MovimientoSchema = z.object({
   ultimaEdicion: z.string(),
 });
 export type Movimiento = z.infer<typeof MovimientoSchema>;
+
+/**
+ * Forma de un movimiento recién mapeado DESDE Notion (el importador): aún no tiene `id`
+ * (lo pone la BD al insertar) y `notionPageId` siempre está presente. Lo usa el sync.
+ */
+export const MovimientoImportSchema = MovimientoSchema.omit({ id: true, origen: true }).extend({
+  notionPageId: z.string(),
+});
+export type MovimientoImport = z.infer<typeof MovimientoImportSchema>;
 
 /** Deriva el flujo a partir del campo `type` de Notion. */
 export function flujoDeTipo(tipo: string | null): Flujo {
@@ -75,9 +84,9 @@ export type CrearMovimientoInput = z.infer<typeof CrearMovimientoInputSchema>;
 export const PERSONAS_DEUDA = ["Tia Anay", "RafaYDay", "Leo", "Guille"] as const;
 
 export const DeudaSchema = z.object({
-  id: z.string().optional(),
-  origen: z.string().optional(), // notion | app | email | manual
-  notionPageId: z.string(),
+  id: z.string(),
+  origen: z.string().optional(),
+  notionPageId: z.string().nullable().optional(),
   concepto: z.string(),
   fechaCreacion: z.string().nullable(),
   valor: z.number().nullable(),
@@ -86,6 +95,12 @@ export const DeudaSchema = z.object({
   ultimaEdicion: z.string(),
 });
 export type Deuda = z.infer<typeof DeudaSchema>;
+
+/** Forma de una deuda recién mapeada DESDE Notion (sin `id`; `notionPageId` presente). */
+export const DeudaImportSchema = DeudaSchema.omit({ id: true, origen: true }).extend({
+  notionPageId: z.string(),
+});
+export type DeudaImport = z.infer<typeof DeudaImportSchema>;
 
 /**
  * Alta de un movimiento de deuda desde la app → se escribe en Notion.

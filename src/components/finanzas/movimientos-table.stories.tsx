@@ -14,6 +14,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const mov = (over: Partial<Movimiento>): Movimiento => ({
+  id: crypto.randomUUID(),
   notionPageId: crypto.randomUUID(),
   nombre: "Movimiento",
   fecha: "2026-06-01",

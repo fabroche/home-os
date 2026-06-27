@@ -1,6 +1,16 @@
 import "@/lib/server-guard";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import { MovimientoSchema, DeudaSchema, type Movimiento, type Deuda } from "@/types/finanzas";
+import {
+  MovimientoSchema,
+  DeudaSchema,
+  flujoDeTipo,
+  firmarImporte,
+  firmarValorDeuda,
+  type Movimiento,
+  type Deuda,
+  type CrearMovimientoInput,
+  type CrearDeudaInput,
+} from "@/types/finanzas";
 
 // Agregaciones puras (testeables sin server-only); se re-exportan por comodidad.
 export { resumen, type ResumenFinanzas } from "@/lib/finanzas/aggregations";
@@ -15,7 +25,7 @@ export { resumen, type ResumenFinanzas } from "@/lib/finanzas/aggregations";
 type MovimientoRow = {
   id: string;
   origen: string | null;
-  notion_page_id: string;
+  notion_page_id: string | null;
   nombre: string | null;
   fecha: string | null;
   importe: number | string | null;
@@ -32,7 +42,7 @@ type MovimientoRow = {
 type DeudaRow = {
   id: string;
   origen: string | null;
-  notion_page_id: string;
+  notion_page_id: string | null;
   concepto: string | null;
   fecha_creacion: string | null;
   valor: number | string | null;
@@ -92,26 +102,105 @@ export async function listDeudas(): Promise<Deuda[]> {
   return (data as DeudaRow[]).map(rowToDeuda);
 }
 
-/**
- * Soft-delete del espejo en Supabase (deleted_at = ahora). Refleja al instante un
- * borrado/archivado en Notion sin esperar al sync por cron; la UI ya solo lee activos.
- */
-export async function softDeleteMovimiento(pageId: string): Promise<void> {
+// === Escritura NATIVA (Fase B): la app escribe directo en Supabase (origen='app'). ===
+// Editar/borrar una fila que vino de Notion la "adopta" (origen='app') para que el
+// importador deje de gobernarla y el cambio sea permanente.
+
+/** Crea un movimiento nativo (gasto/ingreso) con el importe ya firmado. Devuelve su `id`. */
+export async function crearMovimientoNativo(d: CrearMovimientoInput, userId: string): Promise<string> {
+  const sb = createSupabaseServiceClient();
+  const now = new Date().toISOString();
+  const flujo = flujoDeTipo(d.tipo);
+  const { data, error } = await sb
+    .from("movimiento")
+    .insert({
+      user_id: userId,
+      origen: "app",
+      nombre: d.nombre,
+      fecha: d.fecha,
+      importe: firmarImporte(d.importe, flujo),
+      categoria: d.categoria,
+      tipo: d.tipo,
+      estado: d.estado,
+      flujo,
+      facturas: [],
+      comprobantes: [],
+      ultima_edicion: now,
+      synced_at: now,
+      deleted_at: null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(`crearMovimientoNativo: ${error.message}`);
+  return data!.id as string;
+}
+
+/** Crea una deuda/pago nativo con el valor ya firmado (deuda negativa, pago positivo). */
+export async function crearDeudaNativa(d: CrearDeudaInput, userId: string): Promise<string> {
+  const sb = createSupabaseServiceClient();
+  const now = new Date().toISOString();
+  const { data, error } = await sb
+    .from("deuda")
+    .insert({
+      user_id: userId,
+      origen: "app",
+      concepto: d.concepto,
+      fecha_creacion: d.fecha,
+      valor: firmarValorDeuda(d.valor, d.movimiento),
+      persona: d.persona,
+      ultima_edicion: now,
+      synced_at: now,
+      deleted_at: null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(`crearDeudaNativa: ${error.message}`);
+  return data!.id as string;
+}
+
+/** Cambia el estado de un movimiento (Pending↔Done) por `id`; lo adopta (origen='app'). */
+export async function actualizarEstadoMovimiento(id: string, estado: string): Promise<void> {
+  const sb = createSupabaseServiceClient();
+  const { error } = await sb.from("movimiento").update({ estado, origen: "app" }).eq("id", id);
+  if (error) throw new Error(`actualizarEstadoMovimiento: ${error.message}`);
+}
+
+/** Soft-delete de un movimiento por `id`; lo adopta para que el importador no lo reviva. */
+export async function borrarMovimientoById(id: string): Promise<void> {
   const sb = createSupabaseServiceClient();
   const { error } = await sb
     .from("movimiento")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("notion_page_id", pageId);
-  if (error) throw new Error(`softDeleteMovimiento: ${error.message}`);
+    .update({ deleted_at: new Date().toISOString(), origen: "app" })
+    .eq("id", id);
+  if (error) throw new Error(`borrarMovimientoById: ${error.message}`);
 }
 
-export async function softDeleteDeuda(pageId: string): Promise<void> {
+/** Soft-delete de una deuda por `id`; la adopta para que el importador no la reviva. */
+export async function borrarDeudaById(id: string): Promise<void> {
   const sb = createSupabaseServiceClient();
   const { error } = await sb
     .from("deuda")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("notion_page_id", pageId);
-  if (error) throw new Error(`softDeleteDeuda: ${error.message}`);
+    .update({ deleted_at: new Date().toISOString(), origen: "app" })
+    .eq("id", id);
+  if (error) throw new Error(`borrarDeudaById: ${error.message}`);
+}
+
+/** Añade una URL de factura/comprobante a un movimiento por `id`; lo adopta (origen='app'). */
+export async function adjuntarArchivoMovimiento(
+  id: string,
+  tipo: "factura" | "comprobante",
+  url: string,
+): Promise<void> {
+  const sb = createSupabaseServiceClient();
+  const col = tipo === "factura" ? "facturas" : "comprobantes";
+  const { data, error } = await sb.from("movimiento").select("facturas, comprobantes").eq("id", id).single();
+  if (error) throw new Error(`adjuntarArchivoMovimiento(leer): ${error.message}`);
+  const existentes = ((data as Record<string, string[] | null>)[col] ?? []) as string[];
+  const { error: e2 } = await sb
+    .from("movimiento")
+    .update({ [col]: [...existentes, url], origen: "app" })
+    .eq("id", id);
+  if (e2) throw new Error(`adjuntarArchivoMovimiento(escribir): ${e2.message}`);
 }
 
 /** Marca de la última sincronización Notion→Supabase (la más reciente entre fuentes). */
