@@ -5,7 +5,12 @@ import { render, screen, fireEvent } from "@testing-library/react";
 
 // ChatPanel monta SuggestionCard/ActionCard/HerramientaCard, que importan Server Actions: se mockean.
 vi.mock("@/lib/actions/contexto", () => ({ guardarEntrada: vi.fn() }));
-vi.mock("@/lib/actions/finanzas", () => ({ crearMovimiento: vi.fn() }));
+vi.mock("@/lib/actions/finanzas", () => ({
+  crearMovimiento: vi.fn(),
+  editarMovimiento: vi.fn(),
+  editarDeuda: vi.fn(),
+  pagarExtracto: vi.fn(),
+}));
 vi.mock("@/lib/actions/cuentas", () => ({ crearCuenta: vi.fn(), crearTarjeta: vi.fn() }));
 vi.mock("@/lib/actions/cuotas", () => ({ crearPlanCuotas: vi.fn() }));
 vi.mock("@/lib/actions/presupuestos", () => ({ guardarPresupuesto: vi.fn() }));

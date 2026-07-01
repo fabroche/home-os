@@ -6,6 +6,7 @@ import { crearCuenta, crearTarjeta } from "@/lib/actions/cuentas";
 import { crearPlanCuotas } from "@/lib/actions/cuotas";
 import { guardarPresupuesto } from "@/lib/actions/presupuestos";
 import { crearGastoRecurrente } from "@/lib/actions/gastos-recurrentes";
+import { editarMovimiento, editarDeuda, pagarExtracto } from "@/lib/actions/finanzas";
 import { TOOLS, type Herramienta, type CampoTool, type OpcionesFinanzas } from "@/types/ai-tools";
 import { cn } from "@/lib/utils";
 import { Card, CardLabel } from "@/components/ui/card";
@@ -22,6 +23,9 @@ const ACCIONES: Record<Herramienta, (input: unknown) => Promise<WriteLike>> = {
   crear_plan_cuotas: crearPlanCuotas,
   crear_presupuesto: guardarPresupuesto,
   crear_recurrente: crearGastoRecurrente,
+  editar_movimiento: editarMovimiento,
+  editar_deuda: editarDeuda,
+  pagar_extracto: (input) => pagarExtracto((input as { tarjetaId: string }).tarjetaId),
 };
 
 const field = "mt-1 h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm text-foreground";
@@ -91,7 +95,7 @@ export function HerramientaCard({
   if (resuelto) {
     const nombre = form.nombre || form.concepto || tool.titulo;
     const etiqueta =
-      resuelto === "creado" ? "Creado" : resuelto === "superado" ? "Descartado (lo reescribiste)" : "Cancelado";
+      resuelto === "creado" ? "Hecho" : resuelto === "superado" ? "Descartado (lo reescribiste)" : "Cancelado";
     return (
       <Card className="flex items-center gap-2 text-sm text-muted-foreground">
         <Check className="size-4 text-income" />
@@ -105,23 +109,25 @@ export function HerramientaCard({
       <CardLabel>{tool.titulo}</CardLabel>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        {tool.campos.map((c) => (
-          <label
-            key={c.key}
-            className={cn("block text-xs text-muted-foreground", c.tipo === "texto" && "col-span-2")}
-          >
-            {c.label}
-            {"opcional" in c && c.opcional && <span className="text-muted-foreground/60"> (opc)</span>}
-            <CampoInput campo={c} valor={form[c.key] ?? ""} onChange={(v) => set(c.key, v)} opciones={opciones} />
-          </label>
-        ))}
+        {tool.campos
+          .filter((c) => !c.oculto)
+          .map((c) => (
+            <label
+              key={c.key}
+              className={cn("block text-xs text-muted-foreground", c.tipo === "texto" && "col-span-2")}
+            >
+              {c.label}
+              {"opcional" in c && c.opcional && <span className="text-muted-foreground/60"> (opc)</span>}
+              <CampoInput campo={c} valor={form[c.key] ?? ""} onChange={(v) => set(c.key, v)} opciones={opciones} />
+            </label>
+          ))}
       </div>
 
       {error && <p className="mt-2 text-sm text-expense">{error}</p>}
 
       <div className="mt-3 flex flex-wrap gap-2">
         <Button size="sm" disabled={pending} onClick={confirmar}>
-          {pending ? "Creando…" : tool.accionLabel}
+          {pending ? "Guardando…" : tool.accionLabel}
         </Button>
         <Button
           variant="ghost"
