@@ -11,6 +11,7 @@ import {
   porCobrarDeTarjetas,
   gastoPorPersona,
   presupuestoVsGasto,
+  costoDeVida,
   SIN_PERSONA,
 } from "./aggregations";
 import type { Presupuesto } from "@/types/presupuestos";
@@ -273,5 +274,33 @@ describe("presupuestoVsGasto", () => {
     expect(casa.excedido).toBe(true);
 
     expect(r[0]!.categoria).toBe("Casa"); // 112% antes que 80%
+  });
+});
+
+describe("costoDeVida", () => {
+  const gasto = (importe: number, tipo: string, fecha: string): Movimiento => ({
+    ...movCF("gasto", importe, "Casa", fecha),
+    tipo,
+  });
+
+  it("promedia el gasto de los meses previos con datos y separa fijos/variables", () => {
+    const movs = [
+      gasto(-800, "Gasto Fijo", "2026-06-01"),
+      gasto(-200, "Gasto Variable", "2026-06-15"),
+      gasto(-800, "Gasto Fijo", "2026-05-01"),
+      gasto(-300, "Gasto Variable", "2026-05-20"),
+      gasto(-100, "Gasto Variable", "2026-07-03"), // mes actual → fuera de la ventana
+      gasto(-50, "Gasto Fijo", "2026-03-01"), // anterior a la ventana → fuera
+    ];
+    const r = costoDeVida(movs, "2026-07", 3); // ventana: 06, 05, 04 → con datos: 06, 05
+    expect(r.meses).toBe(2);
+    expect(r.fijos).toBe(800); // 1600 / 2
+    expect(r.variables).toBe(250); // 500 / 2
+    expect(r.mensual).toBe(1050); // 2100 / 2
+  });
+
+  it("sin datos en la ventana → todo 0", () => {
+    const r = costoDeVida([gasto(-100, "Gasto Fijo", "2026-07-05")], "2026-07", 3);
+    expect(r).toEqual({ mensual: 0, fijos: 0, variables: 0, meses: 0 });
   });
 });

@@ -8,6 +8,7 @@ import {
   porCobrarDeTarjetas,
   gastoPorPersona,
   presupuestoVsGasto,
+  costoDeVida,
 } from "@/lib/finanzas/aggregations";
 import { PERSONAS_DEUDA, CATEGORIAS } from "@/types/finanzas";
 import { listPresupuestos } from "@/lib/services/presupuestos";
@@ -76,6 +77,8 @@ export default async function FinanzasPage() {
   // Presupuestos del mes en curso (gastado vs tope por categoría).
   const mesActual = new Date().toISOString().slice(0, 7);
   const presupuestoItems = presupuestoVsGasto(movimientos, presupuestos, mesActual);
+  // Costo de vida: gasto mensual medio de los últimos meses (fijos vs variables).
+  const cdv = costoDeVida(movimientos, mesActual);
   const rd = resumenDeudas(deudas);
   // Resúmenes del modelo nativo: balance por cuenta, extracto de crédito (total + desglose por
   // persona) y gasto por persona. `porCobrarTarjetas` = puente derivado persona↔deuda.
@@ -125,6 +128,32 @@ export default async function FinanzasPage() {
           <Kpi label="Balance" value={r.balance} accent="text-primary" />
           <Kpi label="Deudas por pagar" value={rd.total} accent="text-debt" />
         </div>
+      </Reveal>
+
+      {/* Costo de vida */}
+      <Reveal id="fin-costo-vida" delay={0.08}>
+        <Card className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <CardLabel>
+              Costo de vida{cdv.meses > 0 && ` · media ${cdv.meses} ${cdv.meses === 1 ? "mes" : "meses"}`}
+            </CardLabel>
+            {cdv.meses > 0 ? (
+              <>
+                <div className="mt-2 text-2xl font-semibold nums sm:text-3xl">
+                  {eur(cdv.mensual)} <span className="text-base font-normal text-muted-foreground">/mes</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  fijos <span className="nums text-foreground">{eur(cdv.fijos)}</span> · variables{" "}
+                  <span className="nums text-foreground">{eur(cdv.variables)}</span>
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Aún no hay meses completos con gastos para calcular la media.
+              </p>
+            )}
+          </div>
+        </Card>
       </Reveal>
 
       {/* Categorías + Mensual */}

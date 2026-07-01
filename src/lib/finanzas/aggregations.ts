@@ -260,3 +260,52 @@ export function presupuestoVsGasto(
     })
     .sort((a, b) => b.pct - a.pct);
 }
+
+// === Costo de vida ==========================================================
+
+export type CostoDeVida = {
+  /** Gasto mensual medio (fijos + variables). */
+  mensual: number;
+  /** Media mensual de gastos fijos (tipo "Gasto Fijo"). */
+  fijos: number;
+  /** Media mensual del resto de gastos (variables/hormiga). */
+  variables: number;
+  /** Nº de meses con datos que entraron en la media (0 = sin datos). */
+  meses: number;
+};
+
+/** Los `n` meses (YYYY-MM) inmediatamente anteriores a `mesActual`. */
+function mesesPrevios(mesActual: string, n: number): string[] {
+  const partes = mesActual.split("-").map(Number);
+  const y = partes[0] ?? 0;
+  const m = partes[1] ?? 1;
+  const out: string[] = [];
+  for (let i = 1; i <= n; i++) {
+    const d = new Date(y, m - 1 - i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return out;
+}
+
+/**
+ * Costo de vida = gasto mensual MEDIO de los últimos `ventana` meses completos (los anteriores
+ * a `mesActual`, que suele estar incompleto). Se divide por los meses de la ventana que tienen
+ * datos (no diluye con meses vacíos). Separa fijos (tipo "Gasto Fijo") de variables.
+ */
+export function costoDeVida(movs: Movimiento[], mesActual: string, ventana = 3): CostoDeVida {
+  const ventanaMeses = new Set(mesesPrevios(mesActual, ventana));
+  const conDatos = new Set<string>();
+  let fijos = 0;
+  let variables = 0;
+  for (const m of movs) {
+    if (m.flujo !== "gasto") continue;
+    const ym = (m.fecha ?? "").slice(0, 7);
+    if (!ventanaMeses.has(ym)) continue;
+    conDatos.add(ym);
+    const mag = Math.abs(m.importe ?? 0);
+    if (m.tipo === "Gasto Fijo") fijos += mag;
+    else variables += mag;
+  }
+  const div = Math.max(1, conDatos.size);
+  return { mensual: (fijos + variables) / div, fijos: fijos / div, variables: variables / div, meses: conDatos.size };
+}
