@@ -82,4 +82,37 @@ describe("MovimientosTable", () => {
     fireEvent.click(screen.getByRole("button", { name: /cargar más/i }));
     expect(filas(container)).toHaveLength(25);
   });
+
+  it("filtra por mes", () => {
+    render(
+      <MovimientosTable
+        movimientos={[mov({ nombre: "Junio", fecha: "2026-06-10" }), mov({ nombre: "Julio", fecha: "2026-07-10" })]}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Filtrar por mes"), { target: { value: "2026-07" } });
+    expect(screen.getByText("Julio")).toBeInTheDocument();
+    expect(screen.queryByText("Junio")).not.toBeInTheDocument();
+  });
+
+  it("filtra por rango de fechas (desde/hasta)", () => {
+    render(
+      <MovimientosTable
+        movimientos={[
+          mov({ nombre: "Antes", fecha: "2026-06-01" }),
+          mov({ nombre: "Dentro", fecha: "2026-07-15" }),
+          mov({ nombre: "Despues", fecha: "2026-08-20" }),
+        ]}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-07-01" } });
+    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-07-31" } });
+    expect(screen.getByText("Dentro")).toBeInTheDocument();
+    expect(screen.queryByText("Antes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Despues")).not.toBeInTheDocument();
+  });
+
+  it("deshabilita el botón CSV cuando no hay resultados", () => {
+    render(<MovimientosTable movimientos={[]} />);
+    expect(screen.getByRole("button", { name: /csv/i })).toBeDisabled();
+  });
 });
