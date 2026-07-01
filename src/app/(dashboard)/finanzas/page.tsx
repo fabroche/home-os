@@ -17,7 +17,7 @@ import { NuevaDeuda } from "@/components/finanzas/nueva-deuda";
 import { NuevaCuenta } from "@/components/finanzas/nueva-cuenta";
 import { NuevaTarjeta } from "@/components/finanzas/nueva-tarjeta";
 import { NuevoPlanCuotas } from "@/components/finanzas/nuevo-plan-cuotas";
-import { BorrarButton } from "@/components/finanzas/borrar-button";
+import { DeudasTable } from "@/components/finanzas/deudas-table";
 import { PagarExtractoButton } from "@/components/finanzas/pagar-extracto-button";
 import { listCuentas, listTarjetas } from "@/lib/services/cuentas";
 import { listPlanes } from "@/lib/services/cuotas";
@@ -83,6 +83,15 @@ export default async function FinanzasPage() {
       ...PERSONAS_DEUDA,
     ]),
   ].sort();
+  // Para etiquetar/editar movimientos: personas de deudas + las ya usadas en movimientos.
+  const personasMov = [
+    ...new Set([
+      ...personasDeuda,
+      ...movimientos.map((m) => m.persona).filter((p): p is string => Boolean(p)),
+    ]),
+  ].sort();
+  const cuentasOpt = cuentas.map((c) => ({ id: c.id, nombre: c.nombre }));
+  const tarjetasOpt = tarjetas.map((t) => ({ id: t.id, nombre: t.nombre }));
 
   return (
     <main className="container-app max-w-5xl py-8 sm:py-12">
@@ -198,46 +207,7 @@ export default async function FinanzasPage() {
               )}
             </Card>
 
-            <div className="overflow-x-auto rounded-xl border border-border max-md:border-0">
-              <table className="reflow-cards w-full text-sm">
-                <thead className="bg-secondary text-left text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-2.5 font-medium">Concepto</th>
-                    <th className="px-4 py-2.5 font-medium">Persona</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Movimiento</th>
-                    <th className="px-4 py-2.5 font-medium">
-                      <span className="sr-only">Acciones</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deudas.map((d) => (
-                    <tr key={d.id} className="border-t border-border transition-colors hover:bg-accent/50">
-                      <td className="px-4 py-2.5" data-label="Concepto">{d.concepto || "—"}</td>
-                      <td className="px-4 py-2.5" data-label="Persona">{d.persona ?? "—"}</td>
-                      <td
-                        data-label="Movimiento"
-                        className={`px-4 py-2.5 text-right nums ${
-                          d.valor == null ? "" : d.valor < 0 ? "text-debt" : "text-income"
-                        }`}
-                      >
-                        {d.valor != null ? eur(d.valor) : "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-right max-md:text-left" data-label="Acciones">
-                        <BorrarButton tipo="deuda" pageId={d.id} nombre={d.concepto || "deuda"} />
-                      </td>
-                    </tr>
-                  ))}
-                  {deudas.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                        Sin deudas.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <DeudasTable deudas={deudas} personas={personasDeuda} />
           </div>
         </section>
       </Reveal>
@@ -391,7 +361,12 @@ export default async function FinanzasPage() {
             personas={personasDeuda}
           />
         </div>
-        <MovimientosTable movimientos={movimientos} />
+        <MovimientosTable
+          movimientos={movimientos}
+          cuentas={cuentasOpt}
+          tarjetas={tarjetasOpt}
+          personas={personasMov}
+        />
       </Reveal>
     </main>
   );

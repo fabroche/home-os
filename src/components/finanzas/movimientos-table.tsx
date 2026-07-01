@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Search } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, Pencil, Search } from "lucide-react";
 import type { Movimiento } from "@/types/finanzas";
 import { EstadoToggle } from "@/components/finanzas/estado-toggle";
 import { ArchivosCell } from "@/components/finanzas/archivos-cell";
 import { BorrarButton } from "@/components/finanzas/borrar-button";
+import { EditarMovimiento } from "@/components/finanzas/editar-movimiento";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -32,8 +33,18 @@ function cmp<T>(a: T | null, b: T | null, fn: (x: T, y: T) => number): number {
   return fn(a, b);
 }
 
-/** Tabla de movimientos: búsqueda, filtros, orden por columnas y "cargar más". */
-export function MovimientosTable({ movimientos }: { movimientos: Movimiento[] }) {
+/** Tabla de movimientos: búsqueda, filtros, orden por columnas, edición inline y "cargar más". */
+export function MovimientosTable({
+  movimientos,
+  cuentas = [],
+  tarjetas = [],
+  personas = [],
+}: {
+  movimientos: Movimiento[];
+  cuentas?: { id: string; nombre: string }[];
+  tarjetas?: { id: string; nombre: string }[];
+  personas?: string[];
+}) {
   const [q, setQ] = useState("");
   const [flujo, setFlujo] = useState("");
   const [categoria, setCategoria] = useState("");
@@ -41,6 +52,7 @@ export function MovimientosTable({ movimientos }: { movimientos: Movimiento[] })
   const [sortField, setSortField] = useState<SortField>("fecha");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [visible, setVisible] = useState(PAGE);
+  const [editando, setEditando] = useState<string | null>(null);
 
   const categorias = useMemo(
     () => [...new Set(movimientos.map((m) => m.categoria).filter((c): c is string => Boolean(c)))].sort(),
@@ -140,26 +152,56 @@ export function MovimientosTable({ movimientos }: { movimientos: Movimiento[] })
           </thead>
           <tbody>
             {mostradas.map((m) => (
-              <tr key={m.id} className="border-t border-border transition-colors hover:bg-accent/50">
-                <td className="px-4 py-2.5 nums text-muted-foreground" data-label="Fecha">{m.fecha ?? "—"}</td>
-                <td className="px-4 py-2.5 max-md:font-medium" data-label="Nombre">
-                  {m.nombre || "—"}
-                  {m.persona && <span className="ml-1.5 text-xs font-normal text-muted-foreground">· {m.persona}</span>}
-                </td>
-                <td className="px-4 py-2.5 text-muted-foreground" data-label="Categoría">{m.categoria ?? "—"}</td>
-                <td className="px-4 py-2.5" data-label="Estado">
-                  <EstadoToggle pageId={m.id} estado={m.estado} />
-                </td>
-                <td className="px-4 py-2.5" data-label="Archivos">
-                  <ArchivosCell pageId={m.id} facturas={m.facturas} comprobantes={m.comprobantes} />
-                </td>
-                <td className={`px-4 py-2.5 text-right nums font-medium ${COLOR_FLUJO[m.flujo] ?? ""}`} data-label="Importe">
-                  {m.importe != null ? eur(m.importe) : "—"}
-                </td>
-                <td className="px-4 py-2.5 text-right max-md:text-left" data-label="Acciones">
-                  <BorrarButton tipo="movimiento" pageId={m.id} nombre={m.nombre || "movimiento"} />
-                </td>
-              </tr>
+              <Fragment key={m.id}>
+                <tr className="border-t border-border transition-colors hover:bg-accent/50">
+                  <td className="px-4 py-2.5 nums text-muted-foreground" data-label="Fecha">{m.fecha ?? "—"}</td>
+                  <td className="px-4 py-2.5 max-md:font-medium" data-label="Nombre">
+                    {m.nombre || "—"}
+                    {m.persona && <span className="ml-1.5 text-xs font-normal text-muted-foreground">· {m.persona}</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-muted-foreground" data-label="Categoría">{m.categoria ?? "—"}</td>
+                  <td className="px-4 py-2.5" data-label="Estado">
+                    <EstadoToggle pageId={m.id} estado={m.estado} />
+                  </td>
+                  <td className="px-4 py-2.5" data-label="Archivos">
+                    <ArchivosCell pageId={m.id} facturas={m.facturas} comprobantes={m.comprobantes} />
+                  </td>
+                  <td className={`px-4 py-2.5 text-right nums font-medium ${COLOR_FLUJO[m.flujo] ?? ""}`} data-label="Importe">
+                    {m.importe != null ? eur(m.importe) : "—"}
+                  </td>
+                  <td className="px-4 py-2.5 text-right max-md:text-left" data-label="Acciones">
+                    <span className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditando((id) => (id === m.id ? null : m.id))}
+                        aria-label={`Editar ${m.nombre || "movimiento"}`}
+                        title="Editar"
+                        className={cn(
+                          "inline-grid size-7 place-items-center rounded-md text-muted-foreground transition-colors",
+                          "hover:bg-primary/10 hover:text-primary max-md:size-9",
+                          editando === m.id && "bg-primary/10 text-primary",
+                        )}
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                      <BorrarButton tipo="movimiento" pageId={m.id} nombre={m.nombre || "movimiento"} />
+                    </span>
+                  </td>
+                </tr>
+                {editando === m.id && (
+                  <tr className="edit-row border-t border-border">
+                    <td colSpan={7} className="edit-cell px-4 py-3">
+                      <EditarMovimiento
+                        movimiento={m}
+                        cuentas={cuentas}
+                        tarjetas={tarjetas}
+                        personas={personas}
+                        onDone={() => setEditando(null)}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
             {filtradas.length === 0 && (
               <tr>
