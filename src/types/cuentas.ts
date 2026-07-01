@@ -41,17 +41,28 @@ export const TarjetaSchema = z.object({
 });
 export type Tarjeta = z.infer<typeof TarjetaSchema>;
 
-const diaMes = z.number().int().min(1).max(28);
+const diaMes = z
+  .number()
+  .int("El día debe ser un número entero")
+  .min(1, "El día debe estar entre 1 y 28")
+  .max(28, "El día debe estar entre 1 y 28");
 
 /**
  * Alta de tarjeta. Para crédito, `limite`/`diaCorte`/`diaPago` son relevantes (opcionales);
  * para débito se ignoran. La cuenta a la que liquida es opcional.
+ *
+ * `limite`: un 0 (o vacío) significa "sin límite" → se normaliza a null, no es un error.
  */
 export const CrearTarjetaInputSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(80),
   tipo: z.enum(TARJETA_TIPOS),
   cuentaId: z.string().nullable().default(null),
-  limite: z.number().positive().nullable().default(null),
+  limite: z
+    .preprocess(
+      (v) => (v === 0 ? null : v),
+      z.number().positive("El límite debe ser mayor que 0").nullable(),
+    )
+    .default(null),
   diaCorte: diaMes.nullable().default(null),
   diaPago: diaMes.nullable().default(null),
 });
