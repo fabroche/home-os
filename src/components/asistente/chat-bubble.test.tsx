@@ -27,6 +27,14 @@ vi.mock("@/lib/actions/finanzas", () => ({
   borrarMovimiento: vi.fn(),
   borrarDeuda: vi.fn(),
 }));
+// HerramientaCard (vía ChatPanel) + carga de opciones importan Server Actions: se mockean.
+vi.mock("@/lib/actions/opciones", () => ({
+  opcionesFinanzas: vi.fn(() => Promise.resolve({ cuentas: [], tarjetas: [], personas: [] })),
+}));
+vi.mock("@/lib/actions/cuentas", () => ({ crearCuenta: vi.fn(), crearTarjeta: vi.fn() }));
+vi.mock("@/lib/actions/cuotas", () => ({ crearPlanCuotas: vi.fn() }));
+vi.mock("@/lib/actions/presupuestos", () => ({ guardarPresupuesto: vi.fn() }));
+vi.mock("@/lib/actions/gastos-recurrentes", () => ({ crearGastoRecurrente: vi.fn() }));
 
 // Respuesta del router que propone un gasto (reutilizada en varios tests de tarjetas).
 const PROPUESTA_GASTO = {

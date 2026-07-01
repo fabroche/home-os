@@ -5,6 +5,7 @@ import { recuperarContexto, listarContexto } from "@/lib/ai/context/retrieve";
 import { tomarSiguiente, marcar, reintentar } from "@/lib/ai/jobs";
 import { CuotaAgotadaError, detectarCuota, esCuotaAgotada } from "@/lib/ai/errors";
 import { listMovimientos, listDeudas } from "@/lib/services/finanzas";
+import { listCuentas, listTarjetas } from "@/lib/services/cuentas";
 import {
   resumen,
   resumenDeudas,
@@ -13,6 +14,7 @@ import {
   ingresosPorCategoria,
 } from "@/lib/finanzas/aggregations";
 import { JOB_OUTPUT_SCHEMAS, type AiJob } from "@/types/ai";
+import { especificacionTools } from "@/types/ai-tools";
 import { CATEGORIAS, TIPOS, PERSONAS_DEUDA } from "@/types/finanzas";
 import type { FragmentoContexto } from "@/types/contexto";
 
@@ -62,6 +64,8 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       '- "pagado": marcar como pagado uno de los GASTOS PENDIENTES que YA existen (abajo).',
       '- "borrar": ELIMINAR un movimiento o una deuda que YA existe (ej.: "borra el gasto del café").',
       '- "contexto": guardar conocimiento en su banco (preferencias, proveedores, reglas…).',
+      '- "herramienta": CREAR una entidad de finanzas (cuenta, tarjeta, plan de cuotas a plazos,',
+      "  presupuesto o gasto recurrente). Elige la herramienta y rellena sus campos.",
       '- "aclarar": SOLO si el mensaje podría interpretarse razonablemente de MÁS DE UNA forma',
       '  (ej.: "ya pagué la luz" puede ser un gasto nuevo, o marcar como pagada una luz que ya está',
       "  en GASTOS PENDIENTES). No inventes ambigüedad donde no la hay: si está claro, no preguntes.",
@@ -83,6 +87,9 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       "  · si ninguno encaja → objetivo:null, candidatos:[] y dilo en `nota`.",
       "  Solo PROPONES el borrado: el usuario lo confirma después.",
       '- Una PREGUNTA nunca es una acción de registro: "¿en qué gasto más?" es "responder", no "gasto".',
+      '- En "herramienta" elige `herramienta` de la lista de HERRAMIENTAS y rellena `propuesta` con sus',
+      "  campos; para cuentaId/tarjetaId usa el id EXACTO de la lista CUENTAS Y TARJETAS de abajo. Si te",
+      "  falta un dato obligatorio, devuelve propuesta:null y dilo en `nota`.",
       "- Si falta info para registrar (p.ej. el importe), usa esa acción con propuesta:null y dilo en `nota`.",
       "- Si el MENSAJE corrige o ajusta una propuesta anterior de la CONVERSACIÓN RECIENTE (cambia",
       "  importe, fecha, persona, concepto…), vuelve a proponer la MISMA acción con los datos YA",
@@ -96,9 +103,13 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       '{ "accion": "pagado", "movimiento": { "id": string, "nombre": string, "importe": number } | null, "candidatos": [ { "id": string, "nombre": string, "importe": number } ], "nota": string }',
       '{ "accion": "borrar", "objetivo": { "tipo": "movimiento"|"deuda", "id": string, "nombre": string } | null, "candidatos": [ { "tipo": "movimiento"|"deuda", "id": string, "nombre": string } ], "nota": string }',
       '{ "accion": "contexto", "borradores": [ { "tipo": string, "titulo": string, "contenido": string, "tags": [string] } ] }',
+      '{ "accion": "herramienta", "herramienta": string, "propuesta": { …campos de la herramienta… } | null, "nota": string }',
       '{ "accion": "aclarar", "pregunta": string, "opciones": [ { "etiqueta": string, "accion": "responder"|"gasto"|"ingreso"|"deuda"|"pagado"|"contexto" } ] }',
       "En `fuentes` cita solo los fragmentos de CONTEXTO que usaste. En `contexto`, tipos válidos:",
       "regla_financiera, proveedor, preferencia_viaje, contacto, faq, otro.",
+      "",
+      "=== HERRAMIENTAS (para accion 'herramienta'; `herramienta` = uno de estos nombres) ===",
+      especificacionTools(),
       "",
       datos ?? "",
       "",
@@ -325,6 +336,20 @@ async function borrables(): Promise<string> {
   ].join("\n");
 }
 
+/** Lista de cuentas y tarjetas (id + nombre) para que la IA rellene cuentaId/tarjetaId. */
+async function entidadesFinanzas(): Promise<string> {
+  const [cuentas, tarjetas] = await Promise.all([listCuentas(), listTarjetas()]);
+  const c = cuentas.map((x) => `id:${x.id} | ${x.nombre} | ${x.tipo}`);
+  const t = tarjetas.map((x) => `id:${x.id} | ${x.nombre} | ${x.tipo}`);
+  return [
+    "CUENTAS:",
+    c.length ? c.join("\n") : "(ninguna)",
+    "",
+    "TARJETAS:",
+    t.length ? t.join("\n") : "(ninguna)",
+  ].join("\n");
+}
+
 export type RunnerDeps = {
   invocar: (prompt: string) => Promise<string>;
   recuperar: typeof recuperarContexto;
@@ -332,6 +357,7 @@ export type RunnerDeps = {
   finanzas: () => Promise<string>;
   pendientes: () => Promise<string>;
   borrables: () => Promise<string>;
+  entidades: () => Promise<string>;
 };
 const defaultDeps: RunnerDeps = {
   invocar: invocarClaude,
@@ -340,6 +366,7 @@ const defaultDeps: RunnerDeps = {
   finanzas: snapshotFinanzas,
   pendientes: movimientosPendientes,
   borrables,
+  entidades: entidadesFinanzas,
 };
 
 /**
@@ -366,7 +393,12 @@ export async function ejecutarJob(job: AiJob, deps: RunnerDeps = defaultDeps): P
     // El router puede acabar en CUALQUIER acción, así que recibe todo lo que podría
     // necesitar (snapshot para responder + pendientes para marcar pagado + borrables
     // para borrar + hoy).
-    const [snap, pend, borr] = await Promise.all([deps.finanzas(), deps.pendientes(), deps.borrables()]);
+    const [snap, pend, borr, ent] = await Promise.all([
+      deps.finanzas(),
+      deps.pendientes(),
+      deps.borrables(),
+      deps.entidades(),
+    ]);
     datos = [
       `FECHA DE HOY: ${hoy()}`,
       "",
@@ -378,6 +410,9 @@ export async function ejecutarJob(job: AiJob, deps: RunnerDeps = defaultDeps): P
       "",
       "=== MOVIMIENTOS Y DEUDAS (para borrar; formato id:<id> | …) ===",
       borr,
+      "",
+      "=== CUENTAS Y TARJETAS (para herramienta cuentaId/tarjetaId; usa el id EXACTO) ===",
+      ent,
     ].join("\n");
   } else if (job.tipo === "registrar_gasto" || job.tipo === "registrar_ingreso" || job.tipo === "registrar_deuda") {
     datos = hoy(); // fecha de hoy para el prompt
