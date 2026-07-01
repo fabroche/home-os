@@ -134,21 +134,77 @@ export function balancePorCuenta(movs: Movimiento[], cuentas: Cuenta[]): SaldoCu
 export type APagarTarjeta = { tarjeta: Tarjeta; total: number };
 
 /**
- * Cuánto se pagará de cada tarjeta de CRÉDITO = magnitud de sus cargos (gastos) aún
- * PENDIENTES. Al marcarlos pagados (o registrar el pago del extracto) dejan de sumar.
+ * Cuánto se pagará de cada tarjeta de CRÉDITO = magnitud de sus cargos (gastos) aún NO
+ * liquidados (`liquidadoAt` vacío). Al pagar el extracto (liquidar) dejan de sumar.
  */
 export function aPagarPorTarjeta(movs: Movimiento[], tarjetas: Tarjeta[]): APagarTarjeta[] {
   return tarjetas
     .filter((t) => t.tipo === "credito")
     .map((tarjeta) => {
       const total = movs
-        .filter((m) => m.tarjetaId === tarjeta.id && m.flujo === "gasto" && m.estado === "Pending")
+        .filter((m) => m.tarjetaId === tarjeta.id && m.flujo === "gasto" && !m.liquidadoAt)
         .reduce((acc, m) => acc + Math.abs(m.importe ?? 0), 0);
       return { tarjeta, total };
     });
 }
 
 export type GastoPersona = { persona: string; total: number };
+
+/** Etiqueta del bucket propio en un extracto (cargos sin persona asignada = tuyos). */
+export const SIN_PERSONA = "Tú";
+
+export type ExtractoTarjeta = {
+  tarjeta: Tarjeta;
+  /** Magnitud total pendiente de liquidar (lo que pagarás del extracto). */
+  total: number;
+  /** Descomposición por persona (los cargos sin persona van al bucket "Tú"), de mayor a menor. */
+  porPersona: GastoPersona[];
+};
+
+/**
+ * Extracto pendiente de cada tarjeta de CRÉDITO: total de cargos aún NO liquidados y su
+ * descomposición por persona ("300€ tuyos, 500€ de tu pareja"). Los cargos sin persona van al
+ * bucket propio (SIN_PERSONA). Al pagar el extracto (liquidar) los cargos dejan de contar.
+ */
+export function extractoPorTarjeta(movs: Movimiento[], tarjetas: Tarjeta[]): ExtractoTarjeta[] {
+  return tarjetas
+    .filter((t) => t.tipo === "credito")
+    .map((tarjeta) => {
+      const acc = new Map<string, number>();
+      let total = 0;
+      for (const m of movs) {
+        if (m.tarjetaId !== tarjeta.id || m.flujo !== "gasto" || m.liquidadoAt) continue;
+        const mag = Math.abs(m.importe ?? 0);
+        const persona = m.persona?.trim() || SIN_PERSONA;
+        acc.set(persona, (acc.get(persona) ?? 0) + mag);
+        total += mag;
+      }
+      const porPersona = [...acc.entries()]
+        .map(([persona, t]) => ({ persona, total: t }))
+        .sort((a, b) => b.total - a.total);
+      return { tarjeta, total, porPersona };
+    });
+}
+
+/**
+ * Puente persona↔deuda (derivado, sin FK todavía): lo que cada persona te debe por sus cargos
+ * en tus tarjetas de CRÉDITO aún NO liquidados (tú los pagarás por ella). Ignora el bucket
+ * propio (cargos sin persona). De mayor a menor. Para verse junto a `resumenDeudas().porCobrar`.
+ */
+export function porCobrarDeTarjetas(movs: Movimiento[], tarjetas: Tarjeta[]): GastoPersona[] {
+  const credito = new Set(tarjetas.filter((t) => t.tipo === "credito").map((t) => t.id));
+  const acc = new Map<string, number>();
+  for (const m of movs) {
+    if (m.flujo !== "gasto" || m.liquidadoAt) continue;
+    if (!m.tarjetaId || !credito.has(m.tarjetaId)) continue;
+    const persona = m.persona?.trim();
+    if (!persona) continue;
+    acc.set(persona, (acc.get(persona) ?? 0) + Math.abs(m.importe ?? 0));
+  }
+  return [...acc.entries()]
+    .map(([persona, total]) => ({ persona, total }))
+    .sort((a, b) => b.total - a.total);
+}
 
 /**
  * Gasto (magnitud) por persona, de mayor a menor. Si se pasa `tarjetaId`, solo cuenta los

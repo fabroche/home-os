@@ -7,7 +7,10 @@ import {
   resumenDeudas,
   balancePorCuenta,
   aPagarPorTarjeta,
+  extractoPorTarjeta,
+  porCobrarDeTarjetas,
   gastoPorPersona,
+  SIN_PERSONA,
 } from "./aggregations";
 import type { Movimiento, Deuda } from "@/types/finanzas";
 import type { Cuenta, Tarjeta } from "@/types/cuentas";
@@ -180,16 +183,47 @@ describe("balancePorCuenta", () => {
 });
 
 describe("aPagarPorTarjeta", () => {
-  it("suma cargos PENDIENTES de tarjetas de crédito (ignora débito y pagados)", () => {
+  it("suma cargos NO liquidados de tarjetas de crédito (ignora débito y liquidados)", () => {
     const movs: Movimiento[] = [
-      { ...mov("gasto", -100), tarjetaId: "tc", estado: "Pending" },
-      { ...mov("gasto", -40), tarjetaId: "tc", estado: "Done" }, // pagado → no cuenta
-      { ...mov("gasto", -25), tarjetaId: "td", estado: "Pending" }, // débito → no aparece
+      { ...mov("gasto", -100), tarjetaId: "tc" },
+      { ...mov("gasto", -40), tarjetaId: "tc", liquidadoAt: "2026-06-01T00:00:00.000Z" }, // liquidado → no cuenta
+      { ...mov("gasto", -25), tarjetaId: "td" }, // débito → no aparece
     ];
     const r = aPagarPorTarjeta(movs, [tarjeta("tc", "credito"), tarjeta("td", "debito")]);
     expect(r).toHaveLength(1);
     expect(r[0]!.tarjeta.id).toBe("tc");
     expect(r[0]!.total).toBe(100);
+  });
+});
+
+describe("extractoPorTarjeta", () => {
+  it("total pendiente + desglose por persona (sin persona → bucket 'Tú'), solo crédito no liquidado", () => {
+    const movs: Movimiento[] = [
+      { ...mov("gasto", -300), tarjetaId: "tc", persona: "Leo" },
+      { ...mov("gasto", -500), tarjetaId: "tc", persona: "Pareja" },
+      { ...mov("gasto", -200), tarjetaId: "tc" }, // sin persona → bucket propio
+      { ...mov("gasto", -40), tarjetaId: "tc", liquidadoAt: "2026-06-01T00:00:00.000Z" }, // liquidado → fuera
+      { ...mov("gasto", -25), tarjetaId: "td" }, // débito → ignora
+    ];
+    const r = extractoPorTarjeta(movs, [tarjeta("tc", "credito"), tarjeta("td", "debito")]);
+    expect(r).toHaveLength(1);
+    expect(r[0]!.total).toBe(1000); // 300 + 500 + 200
+    expect(r[0]!.porPersona[0]).toEqual({ persona: "Pareja", total: 500 });
+    expect(r[0]!.porPersona.find((p) => p.persona === SIN_PERSONA)?.total).toBe(200);
+  });
+});
+
+describe("porCobrarDeTarjetas", () => {
+  it("agrupa por persona los cargos de crédito no liquidados atribuidos a otros (ignora bucket propio, débito y liquidados)", () => {
+    const movs: Movimiento[] = [
+      { ...mov("gasto", -500), tarjetaId: "tc", persona: "Pareja" },
+      { ...mov("gasto", -200), tarjetaId: "tc", persona: "Pareja" },
+      { ...mov("gasto", -300), tarjetaId: "tc" }, // sin persona → no cobrar
+      { ...mov("gasto", -100), tarjetaId: "tc", persona: "Pareja", liquidadoAt: "2026-06-01T00:00:00.000Z" }, // liquidado → fuera
+      { ...mov("gasto", -30), tarjetaId: "td", persona: "Leo" }, // débito → fuera
+    ];
+    const r = porCobrarDeTarjetas(movs, [tarjeta("tc", "credito"), tarjeta("td", "debito")]);
+    expect(r).toEqual([{ persona: "Pareja", total: 700 }]);
   });
 });
 
