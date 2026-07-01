@@ -174,27 +174,31 @@ export async function crearDeudaNativa(d: CrearDeudaInput, userId: string): Prom
 /**
  * Edita un movimiento existente por `id`. Re-firma el importe según el tipo (por si cambió
  * de gasto a ingreso, etc.) y lo adopta (origen='app') para que el importador no lo pise.
+ *
+ * El etiquetado (cuenta/tarjeta/persona) solo se toca si viene en la entrada: si una clave
+ * llega `undefined` (p.ej. una edición parcial del asistente que solo cambia el importe) se
+ * PRESERVA el valor actual — así una edición por chat no borra las etiquetas. La UI de edición
+ * envía siempre las tres (null o id), por lo que puede vaciarlas explícitamente.
  */
 export async function editarMovimiento(d: EditarMovimientoInput): Promise<void> {
   const sb = createSupabaseServiceClient();
   const flujo = flujoDeTipo(d.tipo);
-  const { error } = await sb
-    .from("movimiento")
-    .update({
-      nombre: d.nombre,
-      fecha: d.fecha,
-      importe: firmarImporte(d.importe, flujo),
-      categoria: d.categoria,
-      tipo: d.tipo,
-      estado: d.estado,
-      flujo,
-      cuenta_id: d.cuentaId ?? null,
-      tarjeta_id: d.tarjetaId ?? null,
-      persona: d.persona?.trim() || null,
-      origen: "app",
-      ultima_edicion: new Date().toISOString(),
-    })
-    .eq("id", d.id);
+  const patch: Record<string, unknown> = {
+    nombre: d.nombre,
+    fecha: d.fecha,
+    importe: firmarImporte(d.importe, flujo),
+    categoria: d.categoria,
+    tipo: d.tipo,
+    estado: d.estado,
+    flujo,
+    origen: "app",
+    ultima_edicion: new Date().toISOString(),
+  };
+  if (d.cuentaId !== undefined) patch.cuenta_id = d.cuentaId;
+  if (d.tarjetaId !== undefined) patch.tarjeta_id = d.tarjetaId;
+  if (d.persona !== undefined) patch.persona = d.persona?.trim() || null;
+
+  const { error } = await sb.from("movimiento").update(patch).eq("id", d.id);
   if (error) throw new Error(`editarMovimiento: ${error.message}`);
 }
 

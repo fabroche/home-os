@@ -26,6 +26,9 @@ vi.mock("@/lib/actions/finanzas", () => ({
   cambiarEstadoMovimiento: vi.fn(),
   borrarMovimiento: vi.fn(),
   borrarDeuda: vi.fn(),
+  editarMovimiento: vi.fn(),
+  editarDeuda: vi.fn(),
+  pagarExtracto: vi.fn(),
 }));
 // HerramientaCard (vía ChatPanel) + carga de opciones importan Server Actions: se mockean.
 vi.mock("@/lib/actions/opciones", () => ({

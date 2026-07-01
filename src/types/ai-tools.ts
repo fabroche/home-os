@@ -1,9 +1,18 @@
 import { z } from "zod";
-import { CATEGORIAS, TIPOS } from "@/types/finanzas";
+import {
+  CATEGORIAS,
+  TIPOS,
+  ESTADOS,
+  EditarMovimientoInputSchema,
+  EditarDeudaInputSchema,
+} from "@/types/finanzas";
 import { CUENTA_TIPOS, TARJETA_TIPOS, CrearCuentaInputSchema, CrearTarjetaInputSchema } from "@/types/cuentas";
 import { CrearPlanCuotasInputSchema } from "@/types/cuotas";
 import { CrearPresupuestoInputSchema } from "@/types/presupuestos";
 import { CrearGastoRecurrenteInputSchema } from "@/types/recurrentes";
+
+/** Pagar el extracto de una tarjeta de crédito (liquida sus cargos pendientes). */
+export const PagarExtractoToolSchema = z.object({ tarjetaId: z.string().min(1, "Falta la tarjeta") });
 
 /**
  * Registro de HERRAMIENTAS del asistente (M6 · tool calling genérico). Cada herramienta
@@ -21,15 +30,21 @@ export const HERRAMIENTAS = [
   "crear_plan_cuotas",
   "crear_presupuesto",
   "crear_recurrente",
+  "editar_movimiento",
+  "editar_deuda",
+  "pagar_extracto",
 ] as const;
 export type Herramienta = (typeof HERRAMIENTAS)[number];
 
-/** Un campo del formulario de una herramienta (dirige el render de la tarjeta genérica). */
+/**
+ * Un campo del formulario de una herramienta (dirige el render de la tarjeta genérica).
+ * `oculto`: no se renderiza pero SÍ va en el payload (p.ej. el `id` en las ediciones).
+ */
 export type CampoTool =
-  | { key: string; label: string; tipo: "texto" | "numero" | "fecha"; opcional?: boolean; ayuda?: string }
-  | { key: string; label: string; tipo: "select"; opciones: readonly string[]; opcional?: boolean }
-  | { key: string; label: string; tipo: "entidad"; entidad: "cuenta" | "tarjeta"; opcional?: boolean }
-  | { key: string; label: string; tipo: "persona"; opcional?: boolean };
+  | { key: string; label: string; tipo: "texto" | "numero" | "fecha"; opcional?: boolean; ayuda?: string; oculto?: boolean }
+  | { key: string; label: string; tipo: "select"; opciones: readonly string[]; opcional?: boolean; oculto?: boolean }
+  | { key: string; label: string; tipo: "entidad"; entidad: "cuenta" | "tarjeta"; opcional?: boolean; oculto?: boolean }
+  | { key: string; label: string; tipo: "persona"; opcional?: boolean; oculto?: boolean };
 
 export type ToolDef = {
   name: Herramienta;
@@ -114,6 +129,48 @@ export const TOOLS: Record<Herramienta, ToolDef> = {
       { key: "tarjetaId", label: "Tarjeta", tipo: "entidad", entidad: "tarjeta", opcional: true },
       { key: "persona", label: "Persona", tipo: "persona", opcional: true },
     ],
+  },
+  editar_movimiento: {
+    name: "editar_movimiento",
+    titulo: "Editar movimiento",
+    descripcion:
+      "Editar un movimiento EXISTENTE (gasto/ingreso). Usa el id EXACTO de MOVIMIENTOS Y DEUDAS y copia sus campos actuales cambiando solo lo que pida el usuario. El etiquetado (cuenta/tarjeta/persona) se conserva si no lo tocas.",
+    accionLabel: "Guardar cambios",
+    schema: EditarMovimientoInputSchema,
+    campos: [
+      { key: "id", label: "id", tipo: "texto", oculto: true },
+      { key: "nombre", label: "Nombre", tipo: "texto" },
+      { key: "importe", label: "Importe (€)", tipo: "numero" },
+      { key: "categoria", label: "Categoría", tipo: "select", opciones: CATEGORIAS },
+      { key: "tipo", label: "Tipo", tipo: "select", opciones: TIPOS },
+      { key: "fecha", label: "Fecha", tipo: "fecha" },
+      { key: "estado", label: "Estado", tipo: "select", opciones: ESTADOS },
+    ],
+  },
+  editar_deuda: {
+    name: "editar_deuda",
+    titulo: "Editar deuda / pago",
+    descripcion:
+      "Editar una deuda o pago EXISTENTE. Usa el id EXACTO de MOVIMIENTOS Y DEUDAS y copia sus campos actuales cambiando solo lo que pida el usuario. `valor` en positivo; `movimiento`: deuda (resta) o pago (suma).",
+    accionLabel: "Guardar cambios",
+    schema: EditarDeudaInputSchema,
+    campos: [
+      { key: "id", label: "id", tipo: "texto", oculto: true },
+      { key: "concepto", label: "Concepto", tipo: "texto" },
+      { key: "persona", label: "Persona", tipo: "persona" },
+      { key: "valor", label: "Valor (€)", tipo: "numero" },
+      { key: "movimiento", label: "Tipo", tipo: "select", opciones: ["deuda", "pago"] },
+      { key: "fecha", label: "Fecha", tipo: "fecha" },
+    ],
+  },
+  pagar_extracto: {
+    name: "pagar_extracto",
+    titulo: "Pagar extracto",
+    descripcion:
+      "Pagar (liquidar) el extracto de una tarjeta de CRÉDITO: marca sus cargos pendientes como liquidados. Elige la tarjeta de crédito de CUENTAS Y TARJETAS.",
+    accionLabel: "Pagar extracto",
+    schema: PagarExtractoToolSchema,
+    campos: [{ key: "tarjetaId", label: "Tarjeta de crédito", tipo: "entidad", entidad: "tarjeta" }],
   },
 };
 

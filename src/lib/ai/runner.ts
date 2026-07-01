@@ -65,7 +65,8 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       '- "borrar": ELIMINAR un movimiento o una deuda que YA existe (ej.: "borra el gasto del café").',
       '- "contexto": guardar conocimiento en su banco (preferencias, proveedores, reglas…).',
       '- "herramienta": CREAR una entidad de finanzas (cuenta, tarjeta, plan de cuotas a plazos,',
-      "  presupuesto o gasto recurrente). Elige la herramienta y rellena sus campos.",
+      "  presupuesto o gasto recurrente), EDITAR un movimiento/deuda existente, o PAGAR el extracto",
+      "  de una tarjeta de crédito. Elige la herramienta y rellena sus campos.",
       '- "aclarar": SOLO si el mensaje podría interpretarse razonablemente de MÁS DE UNA forma',
       '  (ej.: "ya pagué la luz" puede ser un gasto nuevo, o marcar como pagada una luz que ya está',
       "  en GASTOS PENDIENTES). No inventes ambigüedad donde no la hay: si está claro, no preguntes.",
@@ -90,6 +91,9 @@ export function construirPrompt(job: AiJob, fragmentos: FragmentoContexto[], dat
       '- En "herramienta" elige `herramienta` de la lista de HERRAMIENTAS y rellena `propuesta` con sus',
       "  campos; para cuentaId/tarjetaId usa el id EXACTO de la lista CUENTAS Y TARJETAS de abajo. Si te",
       "  falta un dato obligatorio, devuelve propuesta:null y dilo en `nota`.",
+      "  · editar_movimiento/editar_deuda: pon el `id` EXACTO de MOVIMIENTOS Y DEUDAS y COPIA sus campos",
+      "    actuales cambiando SOLO lo que pida el usuario (no vacíes lo que no se mencione).",
+      "  · pagar_extracto: elige la tarjeta de CRÉDITO por su id de CUENTAS Y TARJETAS.",
       "- Si falta info para registrar (p.ej. el importe), usa esa acción con propuesta:null y dilo en `nota`.",
       "- Si el MENSAJE corrige o ajusta una propuesta anterior de la CONVERSACIÓN RECIENTE (cambia",
       "  importe, fecha, persona, concepto…), vuelve a proponer la MISMA acción con los datos YA",
@@ -318,20 +322,28 @@ async function movimientosPendientes(): Promise<string> {
     .join("\n");
 }
 
-/** Lista de movimientos y deudas (con su `id` nativo) que la IA puede proponer BORRAR. */
+/**
+ * Lista de movimientos y deudas (con su `id` nativo) para BORRAR o EDITAR. Incluye los campos
+ * que una edición necesita copiar (categoría/tipo/estado en movimientos; persona/fecha en deudas).
+ */
 async function borrables(): Promise<string> {
   const [movs, deudas] = await Promise.all([listMovimientos(), listDeudas()]);
   const m = movs
     .slice(0, 40)
-    .map((x) => `id:${x.id} | ${x.nombre} | ${Math.abs(x.importe ?? 0).toFixed(2)} € | ${x.fecha ?? "sin fecha"} | ${x.estado ?? ""}`);
+    .map(
+      (x) =>
+        `id:${x.id} | ${x.nombre} | ${Math.abs(x.importe ?? 0).toFixed(2)} € | ${x.categoria ?? "—"} | ${x.tipo ?? "—"} | ${x.fecha ?? "sin fecha"} | ${x.estado ?? ""}`,
+    );
   const d = deudas
     .slice(0, 40)
-    .map((x) => `id:${x.id} | ${x.concepto} | ${x.persona ?? "—"} | ${(x.valor ?? 0).toFixed(2)} €`);
+    .map(
+      (x) => `id:${x.id} | ${x.concepto} | ${x.persona ?? "—"} | ${(x.valor ?? 0).toFixed(2)} € | ${x.fechaCreacion ?? "sin fecha"}`,
+    );
   return [
-    "MOVIMIENTOS:",
+    "MOVIMIENTOS (id | nombre | importe | categoría | tipo | fecha | estado):",
     m.length ? m.join("\n") : "(ninguno)",
     "",
-    "DEUDAS:",
+    "DEUDAS (id | concepto | persona | valor firmado | fecha):",
     d.length ? d.join("\n") : "(ninguna)",
   ].join("\n");
 }
