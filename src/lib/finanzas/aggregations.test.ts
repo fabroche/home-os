@@ -10,8 +10,10 @@ import {
   extractoPorTarjeta,
   porCobrarDeTarjetas,
   gastoPorPersona,
+  presupuestoVsGasto,
   SIN_PERSONA,
 } from "./aggregations";
+import type { Presupuesto } from "@/types/presupuestos";
 import type { Movimiento, Deuda } from "@/types/finanzas";
 import type { Cuenta, Tarjeta } from "@/types/cuentas";
 
@@ -245,5 +247,31 @@ describe("gastoPorPersona", () => {
       { persona: "Pareja", total: 500 },
       { persona: "Yo", total: 300 },
     ]);
+  });
+});
+
+const presupuesto = (categoria: string, monto: number): Presupuesto => ({ id: categoria, categoria, monto });
+
+describe("presupuestoVsGasto", () => {
+  it("suma el gasto del mes por categoría, calcula % y marca excedido; ordena por % desc", () => {
+    const movs = [
+      movCF("gasto", -120, "Comida", "2026-07-05"),
+      movCF("gasto", -80, "Comida", "2026-07-20"),
+      movCF("gasto", -50, "Comida", "2026-06-30"), // otro mes → no cuenta
+      movCF("gasto", -900, "Casa", "2026-07-01"),
+      movCF("ingreso", 1000, "Comida", "2026-07-10"), // ingreso → no cuenta
+    ];
+    const r = presupuestoVsGasto(movs, [presupuesto("Comida", 250), presupuesto("Casa", 800)], "2026-07");
+
+    const comida = r.find((x) => x.categoria === "Comida")!;
+    expect(comida.gastado).toBe(200);
+    expect(comida.pct).toBe(80);
+    expect(comida.excedido).toBe(false);
+
+    const casa = r.find((x) => x.categoria === "Casa")!;
+    expect(casa.gastado).toBe(900);
+    expect(casa.excedido).toBe(true);
+
+    expect(r[0]!.categoria).toBe("Casa"); // 112% antes que 80%
   });
 });

@@ -7,8 +7,10 @@ import {
   extractoPorTarjeta,
   porCobrarDeTarjetas,
   gastoPorPersona,
+  presupuestoVsGasto,
 } from "@/lib/finanzas/aggregations";
-import { PERSONAS_DEUDA } from "@/types/finanzas";
+import { PERSONAS_DEUDA, CATEGORIAS } from "@/types/finanzas";
+import { listPresupuestos } from "@/lib/services/presupuestos";
 import { BarList } from "@/components/finanzas/bar-list";
 import { SyncButton } from "@/components/finanzas/sync-button";
 import { MovimientosTable } from "@/components/finanzas/movimientos-table";
@@ -17,6 +19,7 @@ import { NuevaDeuda } from "@/components/finanzas/nueva-deuda";
 import { NuevaCuenta } from "@/components/finanzas/nueva-cuenta";
 import { NuevaTarjeta } from "@/components/finanzas/nueva-tarjeta";
 import { NuevoPlanCuotas } from "@/components/finanzas/nuevo-plan-cuotas";
+import { PresupuestosCard } from "@/components/finanzas/presupuestos-card";
 import { DeudasTable } from "@/components/finanzas/deudas-table";
 import { PagarExtractoButton } from "@/components/finanzas/pagar-extracto-button";
 import { listCuentas, listTarjetas } from "@/lib/services/cuentas";
@@ -58,17 +61,21 @@ function Kpi({
 }
 
 export default async function FinanzasPage() {
-  const [movimientos, deudas, lastSync, cuentas, tarjetas, planes] = await Promise.all([
+  const [movimientos, deudas, lastSync, cuentas, tarjetas, planes, presupuestos] = await Promise.all([
     listMovimientos(),
     listDeudas(),
     ultimoSync(),
     listCuentas(),
     listTarjetas(),
     listPlanes(),
+    listPresupuestos(),
   ]);
   const r = resumen(movimientos);
   const porCat = gastosPorCategoria(movimientos);
   const meses = porMes(movimientos);
+  // Presupuestos del mes en curso (gastado vs tope por categoría).
+  const mesActual = new Date().toISOString().slice(0, 7);
+  const presupuestoItems = presupuestoVsGasto(movimientos, presupuestos, mesActual);
   const rd = resumenDeudas(deudas);
   // Resúmenes del modelo nativo: balance por cuenta, extracto de crédito (total + desglose por
   // persona) y gasto por persona. `porCobrarTarjetas` = puente derivado persona↔deuda.
@@ -159,6 +166,18 @@ export default async function FinanzasPage() {
           </section>
         </Reveal>
       </div>
+
+      {/* Presupuestos */}
+      <Reveal id="fin-presupuestos">
+        <section className="mt-10">
+          <h2 className="mb-3 text-lg font-semibold">Presupuestos</h2>
+          <PresupuestosCard
+            items={presupuestoItems}
+            categorias={CATEGORIAS}
+            mesLabel={mesLargo(mesActual)}
+          />
+        </section>
+      </Reveal>
 
       {/* Deudas */}
       <Reveal id="fin-deudas">

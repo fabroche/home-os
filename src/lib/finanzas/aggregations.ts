@@ -1,5 +1,6 @@
 import type { Movimiento, Deuda } from "@/types/finanzas";
 import type { Cuenta, Tarjeta } from "@/types/cuentas";
+import type { Presupuesto } from "@/types/presupuestos";
 
 /**
  * Agregaciones PURAS sobre movimientos (sin I/O ni server-only → testeable).
@@ -222,4 +223,40 @@ export function gastoPorPersona(movs: Movimiento[], tarjetaId?: string): GastoPe
   return [...acc.entries()]
     .map(([persona, total]) => ({ persona, total }))
     .sort((a, b) => b.total - a.total);
+}
+
+// === Presupuestos ===========================================================
+
+export type PresupuestoItem = {
+  id: string;
+  categoria: string;
+  /** Tope mensual. */
+  tope: number;
+  /** Gastado en esa categoría durante `mes` (magnitud). */
+  gastado: number;
+  /** Porcentaje del tope consumido (redondeado; puede pasar de 100). */
+  pct: number;
+  /** true si el gasto superó el tope. */
+  excedido: boolean;
+};
+
+/**
+ * Seguimiento de presupuestos para un mes (YYYY-MM): por cada tope, cuánto se ha gastado en
+ * esa categoría de GASTO ese mes, el % consumido y si se excedió. Ordena por % descendente
+ * (lo más apretado primero).
+ */
+export function presupuestoVsGasto(
+  movs: Movimiento[],
+  presupuestos: Presupuesto[],
+  mes: string,
+): PresupuestoItem[] {
+  return presupuestos
+    .map((p) => {
+      const gastado = movs
+        .filter((m) => m.flujo === "gasto" && m.categoria === p.categoria && (m.fecha ?? "").slice(0, 7) === mes)
+        .reduce((acc, m) => acc + Math.abs(m.importe ?? 0), 0);
+      const pct = p.monto > 0 ? Math.round((gastado / p.monto) * 100) : 0;
+      return { id: p.id, categoria: p.categoria, tope: p.monto, gastado, pct, excedido: gastado > p.monto };
+    })
+    .sort((a, b) => b.pct - a.pct);
 }
