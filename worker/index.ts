@@ -33,6 +33,16 @@ async function runCuotas() {
   }
 }
 
+async function runRecurrentes() {
+  try {
+    const { generarRecurrentesPendientes } = await import("@/lib/services/gastos-recurrentes");
+    const creados = await generarRecurrentesPendientes();
+    if (creados > 0) console.warn(`[worker] recurrentes · ${creados} movimiento(s) generado(s)`);
+  } catch (err) {
+    console.error("[worker] recurrentes ERROR:", err instanceof Error ? err.message : err);
+  }
+}
+
 let draining = false;
 async function runDrain() {
   if (draining) return; // evita solapamiento entre ticks
@@ -70,8 +80,10 @@ async function main() {
   );
   await runSync(); // corrida inicial al arrancar
   await runCuotas(); // genera cuotas debidas al arrancar (catch-up si estuvo caído)
+  await runRecurrentes(); // genera recurrentes debidos al arrancar (catch-up)
   cron.schedule(env.SYNC_CRON, runSync);
   cron.schedule("5 0 * * *", runCuotas); // gastos a plazos: una vez al día (00:05)
+  cron.schedule("6 0 * * *", runRecurrentes); // gastos recurrentes: una vez al día (00:06)
   setInterval(runDrain, env.AI_POLL_MS); // drena la cola de IA con frecuencia (chat responsivo)
 }
 

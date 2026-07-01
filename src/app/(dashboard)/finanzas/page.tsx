@@ -21,10 +21,12 @@ import { NuevaCuenta } from "@/components/finanzas/nueva-cuenta";
 import { NuevaTarjeta } from "@/components/finanzas/nueva-tarjeta";
 import { NuevoPlanCuotas } from "@/components/finanzas/nuevo-plan-cuotas";
 import { PresupuestosCard } from "@/components/finanzas/presupuestos-card";
+import { GastosRecurrentesCard } from "@/components/finanzas/gastos-recurrentes-card";
 import { DeudasTable } from "@/components/finanzas/deudas-table";
 import { PagarExtractoButton } from "@/components/finanzas/pagar-extracto-button";
 import { listCuentas, listTarjetas } from "@/lib/services/cuentas";
 import { listPlanes } from "@/lib/services/cuotas";
+import { listRecurrentes } from "@/lib/services/gastos-recurrentes";
 import { Card, CardLabel } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedNumber } from "@/components/ui/count-up";
@@ -62,15 +64,17 @@ function Kpi({
 }
 
 export default async function FinanzasPage() {
-  const [movimientos, deudas, lastSync, cuentas, tarjetas, planes, presupuestos] = await Promise.all([
-    listMovimientos(),
-    listDeudas(),
-    ultimoSync(),
-    listCuentas(),
-    listTarjetas(),
-    listPlanes(),
-    listPresupuestos(),
-  ]);
+  const [movimientos, deudas, lastSync, cuentas, tarjetas, planes, presupuestos, recurrentes] =
+    await Promise.all([
+      listMovimientos(),
+      listDeudas(),
+      ultimoSync(),
+      listCuentas(),
+      listTarjetas(),
+      listPlanes(),
+      listPresupuestos(),
+      listRecurrentes(),
+    ]);
   const r = resumen(movimientos);
   const porCat = gastosPorCategoria(movimientos);
   const meses = porMes(movimientos);
@@ -196,15 +200,26 @@ export default async function FinanzasPage() {
         </Reveal>
       </div>
 
-      {/* Presupuestos */}
+      {/* Presupuestos + Recurrentes */}
       <Reveal id="fin-presupuestos">
-        <section className="mt-10">
-          <h2 className="mb-3 text-lg font-semibold">Presupuestos</h2>
-          <PresupuestosCard
-            items={presupuestoItems}
-            categorias={CATEGORIAS}
-            mesLabel={mesLargo(mesActual)}
-          />
+        <section className="mt-10 grid gap-4 lg:grid-cols-2">
+          <div>
+            <h2 className="mb-3 text-lg font-semibold">Presupuestos</h2>
+            <PresupuestosCard
+              items={presupuestoItems}
+              categorias={CATEGORIAS}
+              mesLabel={mesLargo(mesActual)}
+            />
+          </div>
+          <div>
+            <h2 className="mb-3 text-lg font-semibold">Recurrentes</h2>
+            <GastosRecurrentesCard
+              recurrentes={recurrentes}
+              cuentas={cuentasOpt}
+              tarjetas={tarjetasOpt}
+              personas={personasMov}
+            />
+          </div>
         </section>
       </Reveal>
 
