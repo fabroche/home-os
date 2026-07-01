@@ -10,9 +10,13 @@ import { DeudaCard } from "@/components/asistente/deuda-card";
 import { MarcarPagadoCard } from "@/components/asistente/marcar-pagado-card";
 import { BorrarCard } from "@/components/asistente/borrar-card";
 import { AclararCard } from "@/components/asistente/aclarar-card";
+import { HerramientaCard } from "@/components/asistente/herramienta-card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AccionAsistente } from "@/types/ai";
+import type { OpcionesFinanzas } from "@/types/ai-tools";
+
+const OPCIONES_VACIAS: OpcionesFinanzas = { cuentas: [], tarjetas: [], personas: [] };
 
 /**
  * Panel del asistente (presentacional). En móvil ocupa casi toda la pantalla
@@ -22,6 +26,7 @@ import type { AccionAsistente } from "@/types/ai";
 export function ChatPanel({
   messages,
   pending,
+  opciones = OPCIONES_VACIAS,
   onSend,
   onElegirAccion,
   onResuelto,
@@ -29,6 +34,8 @@ export function ChatPanel({
 }: {
   messages: ChatMsg[];
   pending: boolean;
+  /** Opciones para poblar los selects de la tarjeta genérica de herramientas. */
+  opciones?: OpcionesFinanzas;
   onSend: (texto: string) => void;
   onElegirAccion?: (mensaje: string, accion: AccionAsistente) => void;
   /** Persiste el estado final de una tarjeta de acción en el mensaje que la contiene. */
@@ -120,6 +127,15 @@ export function ChatPanel({
                 key={m.id}
                 objetivo={m.borrarObjetivo}
                 candidatos={m.borrarCandidatos}
+                resueltoInicial={m.accionResuelta}
+                onResuelto={(estado) => onResuelto?.(m.id, estado)}
+              />
+            ) : m.toolPropuesta ? (
+              <HerramientaCard
+                key={m.id}
+                herramienta={m.toolPropuesta.herramienta}
+                propuesta={m.toolPropuesta.propuesta}
+                opciones={opciones}
                 resueltoInicial={m.accionResuelta}
                 onResuelto={(estado) => onResuelto?.(m.id, estado)}
               />

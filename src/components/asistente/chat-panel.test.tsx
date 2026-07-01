@@ -3,9 +3,13 @@ import { describe, it, expect, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
-// ChatPanel monta SuggestionCard y ActionCard, que importan Server Actions: se mockean.
+// ChatPanel monta SuggestionCard/ActionCard/HerramientaCard, que importan Server Actions: se mockean.
 vi.mock("@/lib/actions/contexto", () => ({ guardarEntrada: vi.fn() }));
 vi.mock("@/lib/actions/finanzas", () => ({ crearMovimiento: vi.fn() }));
+vi.mock("@/lib/actions/cuentas", () => ({ crearCuenta: vi.fn(), crearTarjeta: vi.fn() }));
+vi.mock("@/lib/actions/cuotas", () => ({ crearPlanCuotas: vi.fn() }));
+vi.mock("@/lib/actions/presupuestos", () => ({ guardarPresupuesto: vi.fn() }));
+vi.mock("@/lib/actions/gastos-recurrentes", () => ({ crearGastoRecurrente: vi.fn() }));
 
 import { ChatPanel } from "@/components/asistente/chat-panel";
 

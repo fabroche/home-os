@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorradorContexto, ObjetivoBorrar } from "@/types/ai";
+import type { Herramienta } from "@/types/ai-tools";
 import type { CrearMovimientoInput, CrearDeudaInput } from "@/types/finanzas";
 import type { MovimientoAPagar } from "@/components/asistente/marcar-pagado-card";
 import type { AclararData } from "@/components/asistente/aclarar-card";
@@ -49,6 +50,8 @@ export type ChatMsg = {
   borrarObjetivo?: ObjetivoBorrar;
   /** Si está presente, hay VARIOS candidatos a borrar: el usuario elige cuál antes de confirmar. */
   borrarCandidatos?: ObjetivoBorrar[];
+  /** Si está presente, la IA propone CREAR una entidad con una herramienta (tarjeta genérica). */
+  toolPropuesta?: { herramienta: Herramienta; propuesta: Record<string, unknown> };
   /** Si está presente, el router pidió aclarar la intención (se renderiza como tarjeta de opciones). */
   aclarar?: AclararData;
   /** Mensaje original del usuario (en el bubble pendiente del router): lo necesita la tarjeta "aclarar". */

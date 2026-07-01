@@ -22,6 +22,7 @@ import {
   type AccionAsistente,
   type ObjetivoBorrar,
 } from "@/types/ai";
+import type { Herramienta } from "@/types/ai-tools";
 import type { CrearMovimientoInput, CrearDeudaInput } from "@/types/finanzas";
 
 /**
@@ -151,6 +152,13 @@ export type JobEstado =
       nota?: string;
     }
   | { estado: "ok"; tipo: "borrar"; objetivo: ObjetivoBorrar | null; candidatos: ObjetivoBorrar[]; nota?: string }
+  | {
+      estado: "ok";
+      tipo: "herramienta";
+      herramienta: Herramienta;
+      propuesta: Record<string, unknown> | null;
+      nota?: string;
+    }
   | { estado: "ok"; tipo: "aclarar"; pregunta: string; opciones: { etiqueta: string; accion: AccionAsistente }[] }
   | { estado: "error"; error: string };
 
@@ -209,6 +217,8 @@ export async function consultarJob(jobId: string): Promise<JobEstado> {
             return { estado: "ok", tipo: "borrar", objetivo: d.objetivo, candidatos: d.candidatos, nota: d.nota };
           case "contexto":
             return { estado: "ok", tipo: "proponer_contexto", borradores: d.borradores };
+          case "herramienta":
+            return { estado: "ok", tipo: "herramienta", herramienta: d.herramienta, propuesta: d.propuesta, nota: d.nota };
           case "aclarar":
             return { estado: "ok", tipo: "aclarar", pregunta: d.pregunta, opciones: d.opciones };
         }

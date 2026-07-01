@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TIPOS_CONTEXTO } from "@/types/contexto";
 import { CrearMovimientoInputSchema, CrearDeudaInputSchema } from "@/types/finanzas";
+import { HERRAMIENTAS } from "@/types/ai-tools";
 
 /**
  * Tipos de dominio del Asistente IA (M6). La cola `ai_jobs` guarda tareas tipadas
@@ -200,6 +201,14 @@ export const AsistenteOutputSchema = z.discriminatedUnion("accion", [
     nota: NotaSchema,
   }),
   z.object({ accion: z.literal("contexto"), borradores: z.array(BorradorContextoSchema).min(1).max(5) }),
+  // Herramientas de creación (cuenta/tarjeta/plan/presupuesto/recurrente). `propuesta` es un
+  // objeto laxo (lo valida el esquema de la herramienta al confirmar). Si falta info → null + nota.
+  z.object({
+    accion: z.literal("herramienta"),
+    herramienta: z.enum(HERRAMIENTAS),
+    propuesta: z.record(z.string(), z.unknown()).nullable(),
+    nota: NotaSchema,
+  }),
   z.object({
     accion: z.literal("aclarar"),
     pregunta: z.string().trim().min(1).max(300),

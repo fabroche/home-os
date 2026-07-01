@@ -14,9 +14,13 @@ import {
   consultarJob,
   type EncolarResult,
 } from "@/lib/actions/ai";
+import { opcionesFinanzas } from "@/lib/actions/opciones";
 import { ChatPanel } from "@/components/asistente/chat-panel";
 import type { ChatMsg, AccionResuelta } from "@/components/asistente/chat-message";
 import type { AccionAsistente, TurnoConversacion } from "@/types/ai";
+import type { OpcionesFinanzas } from "@/types/ai-tools";
+
+const OPCIONES_VACIAS: OpcionesFinanzas = { cuentas: [], tarjetas: [], personas: [] };
 
 const STORAGE_KEY = "homeos.chat.v1";
 
@@ -32,6 +36,7 @@ function esCardSinResolver(m: ChatMsg): boolean {
         m.borrarObjetivo ||
         m.borrarCandidatos ||
         m.borrador ||
+        m.toolPropuesta ||
         m.aclarar,
     )
   );
@@ -75,6 +80,10 @@ function turnoDeMensaje(m: ChatMsg): TurnoConversacion | null {
     };
   }
   if (m.borrador) return { rol: "assistant", texto: `Propuse guardar en el banco de contexto: "${m.borrador.titulo}".` };
+  if (m.toolPropuesta) {
+    const nombre = m.toolPropuesta.propuesta.nombre ?? m.toolPropuesta.propuesta.concepto ?? m.toolPropuesta.propuesta.categoria ?? "";
+    return { rol: "assistant", texto: `Propuse crear (${m.toolPropuesta.herramienta}): "${String(nombre)}".` };
+  }
   if (m.aclarar) return { rol: "assistant", texto: `Pedí aclaración: ${m.aclarar.pregunta}` };
   return m.contenido ? { rol: "assistant", texto: m.contenido } : null;
 }
@@ -124,6 +133,10 @@ export function ChatBubble({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
+  // Opciones (cuentas/tarjetas/personas) para la tarjeta genérica de herramientas. Se cargan
+  // al abrir el panel por primera vez (la IA propone; el usuario ajusta con selects poblados).
+  const [opciones, setOpciones] = useState<OpcionesFinanzas>(OPCIONES_VACIAS);
+  const opcionesCargadas = useRef(false);
   const primeraPersistencia = useRef(true);
   // Timers de polling en curso, indexados por jobId (uno por consulta). Al terminar
   // (ok/error/tope) se borra la entrada, lo que permite reanudar al reabrir/recargar.
@@ -131,6 +144,15 @@ export function ChatBubble({
 
   // El input se bloquea mientras haya alguna consulta pendiente (derivado, no estado).
   const pending = messages.some((m) => m.pendiente);
+
+  // Carga perezosa de opciones al abrir el panel (una vez): pobla los selects de la card genérica.
+  useEffect(() => {
+    if (!open || opcionesCargadas.current) return;
+    opcionesCargadas.current = true;
+    opcionesFinanzas()
+      .then(setOpciones)
+      .catch(() => {});
+  }, [open]);
 
   useEffect(() => {
     const map = activos.current;
@@ -310,6 +332,24 @@ export function ChatBubble({
                 },
               ];
             });
+          } else if (st.tipo === "herramienta") {
+            const prop = st.propuesta;
+            actualizar(aMsgId, {
+              contenido: prop ? "Te propongo crear esto:" : st.nota || "Me falta algún dato para crearlo. ¿Me lo dices?",
+              pendiente: false,
+              jobId: undefined,
+            });
+            if (prop) {
+              setMessages((ms) => [
+                ...ms,
+                {
+                  id: crypto.randomUUID(),
+                  rol: "assistant" as const,
+                  contenido: "",
+                  toolPropuesta: { herramienta: st.herramienta, propuesta: prop },
+                },
+              ]);
+            }
           } else {
             actualizar(aMsgId, {
               contenido: st.respuesta,
@@ -435,6 +475,7 @@ export function ChatBubble({
             key="panel"
             messages={messages}
             pending={pending}
+            opciones={opciones}
             onSend={onSend}
             onElegirAccion={onElegirAccion}
             onResuelto={onCardResuelto}
