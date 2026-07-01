@@ -43,11 +43,9 @@ describe("EditarMovimiento", () => {
     fireEvent.change(screen.getByDisplayValue("Mercadona"), { target: { value: "Mercadona semanal" } });
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
     await waitFor(() => expect(editarMovimiento).toHaveBeenCalled());
-    expect(editarMovimiento.mock.calls[0][0]).toMatchObject({
-      id: "m1",
-      nombre: "Mercadona semanal",
-      importe: 42.5,
-    });
+    expect(editarMovimiento).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "m1", nombre: "Mercadona semanal", importe: 42.5 }),
+    );
   });
 
   it("muestra el error si la acción falla", async () => {

@@ -12,6 +12,7 @@ import {
   borrarMovimientoById,
   borrarDeudaById,
   adjuntarArchivoMovimiento,
+  pagarExtracto as pagarExtractoSrv,
 } from "@/lib/services/finanzas";
 import { subirArchivoFinanzas } from "@/lib/supabase/storage";
 import {
@@ -177,6 +178,22 @@ export async function borrarDeuda(id: string): Promise<WriteResult> {
     return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Error al borrar la deuda." };
+  }
+}
+
+/**
+ * Paga (liquida) el extracto de una tarjeta de crédito: marca sus cargos pendientes como
+ * liquidados y estampa la cuenta que liquida (baja el banco). Tras confirmación del usuario.
+ */
+export async function pagarExtracto(tarjetaId: string): Promise<WriteResult> {
+  if (!tarjetaId) return { ok: false, error: "Falta la tarjeta." };
+  try {
+    await requireUser();
+    await pagarExtractoSrv(tarjetaId);
+    revalidatePath("/finanzas");
+    return { ok: true, id: tarjetaId };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al pagar el extracto." };
   }
 }
 

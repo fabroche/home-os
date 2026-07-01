@@ -4,7 +4,8 @@ import {
   porMes,
   resumenDeudas,
   balancePorCuenta,
-  aPagarPorTarjeta,
+  extractoPorTarjeta,
+  porCobrarDeTarjetas,
   gastoPorPersona,
 } from "@/lib/finanzas/aggregations";
 import { PERSONAS_DEUDA } from "@/types/finanzas";
@@ -17,6 +18,7 @@ import { NuevaCuenta } from "@/components/finanzas/nueva-cuenta";
 import { NuevaTarjeta } from "@/components/finanzas/nueva-tarjeta";
 import { NuevoPlanCuotas } from "@/components/finanzas/nuevo-plan-cuotas";
 import { DeudasTable } from "@/components/finanzas/deudas-table";
+import { PagarExtractoButton } from "@/components/finanzas/pagar-extracto-button";
 import { listCuentas, listTarjetas } from "@/lib/services/cuentas";
 import { listPlanes } from "@/lib/services/cuotas";
 import { Card, CardLabel } from "@/components/ui/card";
@@ -68,9 +70,11 @@ export default async function FinanzasPage() {
   const porCat = gastosPorCategoria(movimientos);
   const meses = porMes(movimientos);
   const rd = resumenDeudas(deudas);
-  // Resúmenes del modelo nativo: balance por cuenta, a-pagar de crédito y gasto por persona.
+  // Resúmenes del modelo nativo: balance por cuenta, extracto de crédito (total + desglose por
+  // persona) y gasto por persona. `porCobrarTarjetas` = puente derivado persona↔deuda.
   const saldoCuentas = new Map(balancePorCuenta(movimientos, cuentas).map((x) => [x.cuenta.id, x.balance]));
-  const aPagar = new Map(aPagarPorTarjeta(movimientos, tarjetas).map((x) => [x.tarjeta.id, x.total]));
+  const extractos = new Map(extractoPorTarjeta(movimientos, tarjetas).map((x) => [x.tarjeta.id, x]));
+  const porCobrarTarjetas = porCobrarDeTarjetas(movimientos, tarjetas);
   const gastoPersona = gastoPorPersona(movimientos);
   // Personas existentes (de los datos reales) unidas con las conocidas, para el alta de deuda.
   const personasDeuda = [
@@ -244,7 +248,9 @@ export default async function FinanzasPage() {
                 <ul className="space-y-3">
                   {tarjetas.map((t) => {
                     const esCredito = t.tipo === "credito";
-                    const desglose = esCredito ? gastoPorPersona(movimientos, t.id) : [];
+                    const ext = extractos.get(t.id);
+                    const total = ext?.total ?? 0;
+                    const desglose = ext?.porPersona ?? [];
                     return (
                       <li key={t.id} className="text-sm">
                         <div className="flex items-center justify-between gap-2">
@@ -255,15 +261,18 @@ export default async function FinanzasPage() {
                             </Badge>
                           </span>
                           {esCredito && (
-                            <span className="nums font-medium text-debt">
-                              a pagar {eur(aPagar.get(t.id) ?? 0)}
-                            </span>
+                            <span className="nums font-medium text-debt">a pagar {eur(total)}</span>
                           )}
                         </div>
                         {desglose.length > 0 && (
                           <p className="mt-0.5 text-xs text-muted-foreground">
                             {desglose.map((d) => `${d.persona}: ${eur(d.total)}`).join(" · ")}
                           </p>
+                        )}
+                        {esCredito && total > 0 && (
+                          <div className="mt-1.5">
+                            <PagarExtractoButton tarjetaId={t.id} total={total} />
+                          </div>
                         )}
                       </li>
                     );
@@ -275,12 +284,28 @@ export default async function FinanzasPage() {
             </Card>
           </div>
 
-          {gastoPersona.length > 0 && (
-            <Card className="mt-4">
-              <CardLabel className="mb-3">Gasto por persona</CardLabel>
-              <BarList items={gastoPersona.map((g) => ({ label: g.persona, value: g.total }))} format={eur} />
-            </Card>
-          )}
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {gastoPersona.length > 0 && (
+              <Card>
+                <CardLabel className="mb-3">Gasto por persona</CardLabel>
+                <BarList items={gastoPersona.map((g) => ({ label: g.persona, value: g.total }))} format={eur} />
+              </Card>
+            )}
+
+            {porCobrarTarjetas.length > 0 && (
+              <Card>
+                <CardLabel className="mb-1">Por cobrar de tarjetas</CardLabel>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Cargos de tus tarjetas de crédito atribuidos a otra persona (te lo deben).
+                </p>
+                <BarList
+                  items={porCobrarTarjetas.map((g) => ({ label: g.persona, value: g.total }))}
+                  format={eur}
+                  barClassName="bg-income"
+                />
+              </Card>
+            )}
+          </div>
         </section>
       </Reveal>
 

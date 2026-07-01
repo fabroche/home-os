@@ -38,6 +38,9 @@ export const MovimientoSchema = z.object({
   cuentaId: z.string().nullable().optional(),
   tarjetaId: z.string().nullable().optional(),
   persona: z.string().nullable().optional(),
+  // Extracto de crédito: fecha en que el cargo se liquidó (se pagó el extracto). null =
+  // aún pendiente; al liquidar se estampa y el cargo pasa a contar en el banco (ver 0010).
+  liquidadoAt: z.string().nullable().optional(),
   facturas: z.array(z.string()), // URLs de la factura (Notion `invoices`)
   comprobantes: z.array(z.string()).default([]), // URLs del comprobante de pago (Notion `comprobante`)
   flujo: z.enum(["ingreso", "gasto", "deuda"]),

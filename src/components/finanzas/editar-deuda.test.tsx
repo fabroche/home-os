@@ -44,13 +44,15 @@ describe("EditarDeuda", () => {
     render(<EditarDeuda deuda={deuda()} personas={["Leo"]} />);
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
     await waitFor(() => expect(editarDeuda).toHaveBeenCalled());
-    expect(editarDeuda.mock.calls[0][0]).toMatchObject({
-      id: "d1",
-      concepto: "Préstamo",
-      persona: "Leo",
-      valor: 100,
-      movimiento: "deuda",
-    });
+    expect(editarDeuda).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "d1",
+        concepto: "Préstamo",
+        persona: "Leo",
+        valor: 100,
+        movimiento: "deuda",
+      }),
+    );
   });
 
   it("Cancelar llama a onDone sin guardar", () => {

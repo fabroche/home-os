@@ -38,6 +38,7 @@ type MovimientoRow = {
   cuenta_id: string | null;
   tarjeta_id: string | null;
   persona: string | null;
+  liquidado_at: string | null;
   facturas: string[] | null;
   comprobantes: string[] | null;
   url: string | null;
@@ -70,6 +71,7 @@ function rowToMovimiento(r: MovimientoRow): Movimiento {
     cuentaId: r.cuenta_id,
     tarjetaId: r.tarjeta_id,
     persona: r.persona,
+    liquidadoAt: r.liquidado_at,
     facturas: r.facturas ?? [],
     comprobantes: r.comprobantes ?? [],
     flujo: r.flujo,
@@ -256,6 +258,58 @@ export async function adjuntarArchivoMovimiento(
     .update({ [col]: [...existentes, url], origen: "app" })
     .eq("id", id);
   if (e2) throw new Error(`adjuntarArchivoMovimiento(escribir): ${e2.message}`);
+}
+
+/**
+ * Paga (liquida) el extracto de una tarjeta de CRÉDITO: marca todos sus cargos pendientes
+ * (gasto, `liquidado_at IS NULL`) como liquidados y, si la tarjeta liquida contra una cuenta,
+ * les estampa esa `cuenta_id` para que el saldo del banco baje ahora (el dinero sale al pagar
+ * el extracto). No crea un movimiento de "pago": el gasto ya se reconoció al hacer el cargo;
+ * estampar la cuenta al liquidar evita duplicarlo en el balance global. Los adopta (origen='app').
+ * Devuelve cuántos cargos liquidó y el total pagado.
+ */
+export async function pagarExtracto(tarjetaId: string): Promise<{ liquidados: number; total: number }> {
+  const sb = createSupabaseServiceClient();
+
+  const { data: tarjeta, error: te } = await sb
+    .from("tarjeta")
+    .select("id, tipo, cuenta_id")
+    .eq("id", tarjetaId)
+    .single();
+  if (te) throw new Error(`pagarExtracto(tarjeta): ${te.message}`);
+  if ((tarjeta as { tipo: string }).tipo !== "credito") {
+    throw new Error("Solo las tarjetas de crédito tienen extracto.");
+  }
+  const cuentaId = (tarjeta as { cuenta_id: string | null }).cuenta_id;
+
+  const { data: cargos, error: ce } = await sb
+    .from("movimiento")
+    .select("importe")
+    .eq("tarjeta_id", tarjetaId)
+    .eq("flujo", "gasto")
+    .is("liquidado_at", null)
+    .is("deleted_at", null);
+  if (ce) throw new Error(`pagarExtracto(cargos): ${ce.message}`);
+  if (!cargos || cargos.length === 0) return { liquidados: 0, total: 0 };
+
+  const total = (cargos as { importe: number | string | null }[]).reduce(
+    (acc, c) => acc + Math.abs(Number(c.importe ?? 0)),
+    0,
+  );
+
+  const patch: Record<string, unknown> = { liquidado_at: new Date().toISOString(), origen: "app" };
+  if (cuentaId) patch.cuenta_id = cuentaId; // el dinero sale de esa cuenta ahora
+
+  const { error: ue } = await sb
+    .from("movimiento")
+    .update(patch)
+    .eq("tarjeta_id", tarjetaId)
+    .eq("flujo", "gasto")
+    .is("liquidado_at", null)
+    .is("deleted_at", null);
+  if (ue) throw new Error(`pagarExtracto(update): ${ue.message}`);
+
+  return { liquidados: cargos.length, total: Math.round(total * 100) / 100 };
 }
 
 /** Marca de la última sincronización Notion→Supabase (la más reciente entre fuentes). */
