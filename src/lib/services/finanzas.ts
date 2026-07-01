@@ -10,6 +10,8 @@ import {
   type Deuda,
   type CrearMovimientoInput,
   type CrearDeudaInput,
+  type EditarMovimientoInput,
+  type EditarDeudaInput,
 } from "@/types/finanzas";
 
 // Agregaciones puras (testeables sin server-only); se re-exportan por comodidad.
@@ -165,6 +167,50 @@ export async function crearDeudaNativa(d: CrearDeudaInput, userId: string): Prom
     .single();
   if (error) throw new Error(`crearDeudaNativa: ${error.message}`);
   return data!.id as string;
+}
+
+/**
+ * Edita un movimiento existente por `id`. Re-firma el importe según el tipo (por si cambió
+ * de gasto a ingreso, etc.) y lo adopta (origen='app') para que el importador no lo pise.
+ */
+export async function editarMovimiento(d: EditarMovimientoInput): Promise<void> {
+  const sb = createSupabaseServiceClient();
+  const flujo = flujoDeTipo(d.tipo);
+  const { error } = await sb
+    .from("movimiento")
+    .update({
+      nombre: d.nombre,
+      fecha: d.fecha,
+      importe: firmarImporte(d.importe, flujo),
+      categoria: d.categoria,
+      tipo: d.tipo,
+      estado: d.estado,
+      flujo,
+      cuenta_id: d.cuentaId ?? null,
+      tarjeta_id: d.tarjetaId ?? null,
+      persona: d.persona?.trim() || null,
+      origen: "app",
+      ultima_edicion: new Date().toISOString(),
+    })
+    .eq("id", d.id);
+  if (error) throw new Error(`editarMovimiento: ${error.message}`);
+}
+
+/** Edita una deuda/pago existente por `id`. Re-firma el valor (deuda negativa, pago positivo). */
+export async function editarDeuda(d: EditarDeudaInput): Promise<void> {
+  const sb = createSupabaseServiceClient();
+  const { error } = await sb
+    .from("deuda")
+    .update({
+      concepto: d.concepto,
+      persona: d.persona,
+      fecha_creacion: d.fecha,
+      valor: firmarValorDeuda(d.valor, d.movimiento),
+      origen: "app",
+      ultima_edicion: new Date().toISOString(),
+    })
+    .eq("id", d.id);
+  if (error) throw new Error(`editarDeuda: ${error.message}`);
 }
 
 /** Cambia el estado de un movimiento (Pending↔Done) por `id`; lo adopta (origen='app'). */

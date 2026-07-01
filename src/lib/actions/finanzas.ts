@@ -6,13 +6,21 @@ import { syncFinanzas } from "@/lib/notion/sync/finanzas";
 import {
   crearMovimientoNativo,
   crearDeudaNativa,
+  editarMovimiento as editarMovimientoSrv,
+  editarDeuda as editarDeudaSrv,
   actualizarEstadoMovimiento,
   borrarMovimientoById,
   borrarDeudaById,
   adjuntarArchivoMovimiento,
 } from "@/lib/services/finanzas";
 import { subirArchivoFinanzas } from "@/lib/supabase/storage";
-import { CrearMovimientoInputSchema, CrearDeudaInputSchema, ESTADOS } from "@/types/finanzas";
+import {
+  CrearMovimientoInputSchema,
+  CrearDeudaInputSchema,
+  EditarMovimientoInputSchema,
+  EditarDeudaInputSchema,
+  ESTADOS,
+} from "@/types/finanzas";
 
 /**
  * Server Actions de escritura de finanzas (Fase B · Supabase-nativo). La app escribe
@@ -111,6 +119,38 @@ export async function crearDeuda(input: unknown): Promise<WriteResult> {
     return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Error al crear la deuda." };
+  }
+}
+
+/** Edita un movimiento (gasto/ingreso) existente en Supabase. */
+export async function editarMovimiento(input: unknown): Promise<WriteResult> {
+  const parsed = EditarMovimientoInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Revisa los campos.", fieldErrors: zodErrors(parsed.error.issues) };
+  }
+  try {
+    await requireUser();
+    await editarMovimientoSrv(parsed.data);
+    revalidatePath("/finanzas");
+    return { ok: true, id: parsed.data.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al editar el movimiento." };
+  }
+}
+
+/** Edita una deuda/pago existente en Supabase. */
+export async function editarDeuda(input: unknown): Promise<WriteResult> {
+  const parsed = EditarDeudaInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Revisa los campos.", fieldErrors: zodErrors(parsed.error.issues) };
+  }
+  try {
+    await requireUser();
+    await editarDeudaSrv(parsed.data);
+    revalidatePath("/finanzas");
+    return { ok: true, id: parsed.data.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al editar la deuda." };
   }
 }
 

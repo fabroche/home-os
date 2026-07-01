@@ -261,6 +261,19 @@ h4 {
   .reflow-cards td:not([data-label]):empty {
     display: none;
   }
+  /* Fila de edición inline: ocupa toda la tarjeta, sin el layout de celda-fila. */
+  .reflow-cards tr.edit-row {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .reflow-cards td.edit-cell {
+    display: block;
+    padding: 0 !important;
+  }
+  .reflow-cards td.edit-cell::before {
+    content: none;
+  }
 }
 
 /* Blob de gradiente suave para fondos de sección */

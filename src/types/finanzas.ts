@@ -88,6 +88,12 @@ export const CrearMovimientoInputSchema = z.object({
 });
 export type CrearMovimientoInput = z.infer<typeof CrearMovimientoInputSchema>;
 
+/** Edición de un movimiento existente: mismos campos que el alta + su `id`. */
+export const EditarMovimientoInputSchema = CrearMovimientoInputSchema.extend({
+  id: z.string().min(1, "Falta el movimiento"),
+});
+export type EditarMovimientoInput = z.infer<typeof EditarMovimientoInputSchema>;
+
 // --- DB "Deudas_Personales" --------------------------------------------------
 export const PERSONAS_DEUDA = ["Tia Anay", "RafaYDay", "Leo", "Guille"] as const;
 
@@ -123,6 +129,12 @@ export const CrearDeudaInputSchema = z.object({
   fecha: isoDate,
 });
 export type CrearDeudaInput = z.infer<typeof CrearDeudaInputSchema>;
+
+/** Edición de una deuda/pago existente: mismos campos que el alta + su `id`. */
+export const EditarDeudaInputSchema = CrearDeudaInputSchema.extend({
+  id: z.string().min(1, "Falta la deuda"),
+});
+export type EditarDeudaInput = z.infer<typeof EditarDeudaInputSchema>;
 
 /** Firma el valor de un movimiento de deuda: deuda negativa, pago positivo. */
 export function firmarValorDeuda(magnitud: number, movimiento: "deuda" | "pago"): number {
