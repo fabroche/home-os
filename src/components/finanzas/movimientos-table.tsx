@@ -1,18 +1,27 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Pencil, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Pencil, Search } from "lucide-react";
 import type { Movimiento } from "@/types/finanzas";
 import { EstadoToggle } from "@/components/finanzas/estado-toggle";
 import { ArchivosCell } from "@/components/finanzas/archivos-cell";
 import { BorrarButton } from "@/components/finanzas/borrar-button";
 import { EditarMovimiento } from "@/components/finanzas/editar-movimiento";
+import { movimientosToCsv } from "@/lib/finanzas/csv";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
+
+const mesLabel = (ym: string) => {
+  const [y, m] = ym.split("-");
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("es-ES", {
+    month: "long",
+    year: "numeric",
+  });
+};
 
 const COLOR_FLUJO: Record<string, string> = {
   ingreso: "text-income",
@@ -49,6 +58,9 @@ export function MovimientosTable({
   const [flujo, setFlujo] = useState("");
   const [categoria, setCategoria] = useState("");
   const [estado, setEstado] = useState("");
+  const [mes, setMes] = useState("");
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
   const [sortField, setSortField] = useState<SortField>("fecha");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [visible, setVisible] = useState(PAGE);
@@ -59,12 +71,23 @@ export function MovimientosTable({
     [movimientos],
   );
 
+  const meses = useMemo(
+    () =>
+      [...new Set(movimientos.map((m) => m.fecha?.slice(0, 7)).filter((s): s is string => Boolean(s)))]
+        .sort()
+        .reverse(),
+    [movimientos],
+  );
+
   const filtradas = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const out = movimientos.filter((m) => {
       if (flujo && m.flujo !== flujo) return false;
       if (categoria && m.categoria !== categoria) return false;
       if (estado && m.estado !== estado) return false;
+      if (mes && (m.fecha ?? "").slice(0, 7) !== mes) return false;
+      if (desde && (m.fecha ?? "") < desde) return false;
+      if (hasta && (m.fecha ?? "") > hasta) return false;
       if (needle) {
         const hay = `${m.nombre} ${m.categoria ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
@@ -78,9 +101,20 @@ export function MovimientosTable({
       return dir * cmp(a.fecha, b.fecha, (x, y) => x.localeCompare(y));
     });
     return out;
-  }, [movimientos, q, flujo, categoria, estado, sortField, sortDir]);
+  }, [movimientos, q, flujo, categoria, estado, mes, desde, hasta, sortField, sortDir]);
 
   const mostradas = filtradas.slice(0, visible);
+
+  function descargarCsv() {
+    const csv = "﻿" + movimientosToCsv(filtradas); // BOM: acentos correctos en Excel
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `movimientos-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function toggleSort(field: SortField) {
     if (field === sortField) {
@@ -123,9 +157,46 @@ export function MovimientosTable({
           <option value="Pending">Pendiente</option>
           <option value="Done">Pagado</option>
         </Select>
-        <span className="ml-auto text-xs text-muted-foreground">
-          {filtradas.length} de {movimientos.length}
-        </span>
+        <Select value={mes} onChange={(e) => setMes(e.target.value)} className="h-9 w-auto py-1.5 capitalize" aria-label="Filtrar por mes">
+          <option value="">Todos los meses</option>
+          {meses.map((ym) => (
+            <option key={ym} value={ym} className="capitalize">
+              {mesLabel(ym)}
+            </option>
+          ))}
+        </Select>
+        <Input
+          type="date"
+          value={desde}
+          onChange={(e) => setDesde(e.target.value)}
+          className="h-9 w-auto py-1.5"
+          aria-label="Desde"
+          title="Desde"
+        />
+        <Input
+          type="date"
+          value={hasta}
+          onChange={(e) => setHasta(e.target.value)}
+          className="h-9 w-auto py-1.5"
+          aria-label="Hasta"
+          title="Hasta"
+        />
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {filtradas.length} de {movimientos.length}
+          </span>
+          <Button
+            variant="soft"
+            size="sm"
+            onClick={descargarCsv}
+            disabled={filtradas.length === 0}
+            className="h-9 max-sm:h-11"
+            title="Exportar CSV del filtro actual"
+          >
+            <Download className="size-4" />
+            CSV
+          </Button>
+        </div>
       </div>
 
       {/* Tabla (se refluye a tarjetas apiladas en móvil) */}
