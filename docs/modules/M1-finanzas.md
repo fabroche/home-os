@@ -153,12 +153,17 @@ erDiagram
 ```
 
 **Invariantes clave:**
-- **Débito**: el cargo reduce el saldo de la `cuenta` ya. **Crédito**: el cargo NO toca el banco; sube lo que
-  se debe en la `tarjeta`; pagar el extracto (un movimiento desde la cuenta) lo baja.
-- **Balance por cuenta** = `saldo_inicial` + Σ movimientos de esa cuenta (débito y pagos de extracto).
-- **A pagar de una tarjeta de crédito** = Σ cargos a crédito de esa tarjeta no cubiertos aún por un pago de extracto.
-- **Gasto por persona** = Σ movimientos filtrando `persona` (clave en tarjetas compartidas). Puente futuro:
-  un cargo con `persona ≠ yo` puede enlazar a una `DEUDA` (esa persona me debe).
+- **Débito**: el cargo reduce el saldo de la `cuenta` ya. **Crédito**: el cargo NO toca el banco (queda con
+  `cuenta_id` NULL); sube lo que se debe en la `tarjeta`. **Pagar el extracto** = liquidar (migración `0010`):
+  se estampa `movimiento.liquidado_at` a los cargos pendientes de la tarjeta **y** su `cuenta_id` = la cuenta que
+  liquida la tarjeta, para que el banco baje ahora. **No** se crea un movimiento de pago aparte: el gasto ya se
+  reconoció al hacer el cargo; estampar la cuenta al liquidar evita duplicarlo en el balance global.
+- **Balance por cuenta** = `saldo_inicial` + Σ movimientos de esa cuenta (débito + cargos de crédito ya liquidados).
+- **A pagar de una tarjeta de crédito** (extracto pendiente) = Σ cargos a crédito de esa tarjeta con
+  `liquidado_at IS NULL`. Se descompone por `persona` (bucket propio "Tú" para los cargos sin persona).
+- **Gasto por persona** = Σ movimientos filtrando `persona` (clave en tarjetas compartidas). **Puente
+  persona↔deuda** (derivado, sin FK aún): los cargos de crédito no liquidados con `persona ≠ yo` = lo que esa
+  persona te debe ("por cobrar de tarjetas"), pensado para verse junto al "por cobrar" de `DEUDA`.
 - **Cuota i** de un plan = un `movimiento` (cargo en la tarjeta) fechado en el mes i el `dia_facturacion`,
   nombre `"<concepto> (i/N)"`, `importe_cuota` (la última absorbe el redondeo), `origen=app`.
 
